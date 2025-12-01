@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Gastos Grupales</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- Pantalla de Login -->
+    <div id="loginScreen" class="screen active">
+        <div class="login-container">
+            <div class="login-card">
+                <h1><i class="fas fa-wallet"></i> Gestión de Gastos</h1>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Contraseña</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+                    <p class="switch-form">¿No tienes cuenta? <a href="#" id="showRegister">Regístrate</a></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla de Registro -->
+    <div id="registerScreen" class="screen">
+        <div class="login-container">
+            <div class="login-card">
+                <h1><i class="fas fa-user-plus"></i> Registro</h1>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerName">Nombre</label>
+                        <input type="text" id="registerName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">Email</label>
+                        <input type="email" id="registerEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Contraseña</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Registrarse</button>
+                    <p class="switch-form">¿Ya tienes cuenta? <a href="#" id="showLogin">Inicia Sesión</a></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aplicación Principal -->
+    <div id="appScreen" class="screen">
+        <!-- Header con Notificaciones -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1><i class="fas fa-wallet"></i> Mis Grupos</h1>
+                <div class="header-actions">
+                    <button class="btn-icon" id="notificationsBtn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <button class="btn-icon" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Panel de Notificaciones -->
+        <div id="notificationsPanel" class="notifications-panel">
+            <div class="notifications-header">
+                <h3>Notificaciones</h3>
+                <button class="btn-close" id="closeNotifications">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="notificationsList" class="notifications-list">
+                <!-- Las notificaciones se cargan dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Navegación -->
+        <nav class="app-nav">
+            <button class="nav-item active" data-view="grupos">
+                <i class="fas fa-users"></i>
+                <span>Grupos</span>
+            </button>
+            <button class="nav-item" data-view="transacciones">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Transacciones</span>
+            </button>
+        </nav>
+
+        <!-- Vista de Grupos -->
+        <div id="gruposView" class="view active">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Mis Grupos</h2>
+                    <button class="btn btn-primary" id="btnCrearGrupo">
+                        <i class="fas fa-plus"></i> Crear Grupo
+                    </button>
+                </div>
+                <div id="gruposList" class="grupos-grid">
+                    <!-- Los grupos se cargan dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Transacciones -->
+        <div id="transaccionesView" class="view">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Historial de Transacciones</h2>
+                    <button class="btn btn-primary" id="btnNuevaTransaccion">
+                        <i class="fas fa-plus"></i> Nueva Transacción
+                    </button>
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="todas">Todas</button>
+                    <button class="filter-tab" data-filter="pendientes">Pendientes</button>
+                    <button class="filter-tab" data-filter="completadas">Completadas</button>
+                </div>
+                <div id="transaccionesList" class="transacciones-list">
+                    <!-- Las transacciones se cargan dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista de Detalle del Grupo -->
+        <div id="grupoDetalleView" class="view">
+            <div class="container">
+                <button class="btn-back" id="btnBackToGrupos">
+                    <i class="fas fa-arrow-left"></i> Volver
+                </button>
+                <div id="grupoDetalleContent">
+                    <!-- El detalle se carga dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Crear Grupo -->
+    <div id="modalCrearGrupo" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Nuevo Grupo</h3>
+                <button class="btn-close" data-close="modalCrearGrupo">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="formCrearGrupo">
+                <div class="form-group">
+                    <label for="nombreGrupo">Nombre del Grupo</label>
+                    <input type="text" id="nombreGrupo" required>
+                </div>
+                <div class="form-group">
+                    <label for="descripcionGrupo">Descripción</label>
+                    <textarea id="descripcionGrupo" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="miembrosGrupo">Miembros (emails separados por comas)</label>
+                    <textarea id="miembrosGrupo" rows="3" placeholder="juan@email.com, maria@email.com"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalCrearGrupo">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Grupo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Nueva Transacción -->
+    <div id="modalNuevaTransaccion" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nueva Transacción</h3>
+                <button class="btn-close" data-close="modalNuevaTransaccion">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="formNuevaTransaccion">
+                <div class="form-group">
+                    <label for="grupoTransaccion">Grupo</label>
+                    <select id="grupoTransaccion" required>
+                        <option value="">Selecciona un grupo</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="conceptoTransaccion">Concepto</label>
+                    <input type="text" id="conceptoTransaccion" required placeholder="Ej: Cena, Gasolina, Hotel">
+                </div>
+                <div class="form-group">
+                    <label for="montoTransaccion">Monto (€)</label>
+                    <input type="number" id="montoTransaccion" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="tipoTransaccion">Tipo</label>
+                    <select id="tipoTransaccion" required>
+                        <option value="gasto">Gasto</option>
+                        <option value="pago">Pago</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="dividirEquitativamente" checked>
+                        Dividir equitativamente entre todos
+                    </label>
+                </div>
+                <div id="participantesContainer" class="form-group" style="display: none;">
+                    <label>Seleccionar participantes</label>
+                    <div id="participantesList"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalNuevaTransaccion">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Transacción</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/grupos.js"></script>
+    <script src="js/transacciones.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
