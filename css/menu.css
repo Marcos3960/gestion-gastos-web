@@ -89,6 +89,10 @@ a {
     letter-spacing: 0.02em;
 }
 
+.logo-redes {
+    width: 10%;
+    height: 10%;
+}
 .main-nav {
     display: flex;
     gap: 1.5rem;
@@ -186,6 +190,23 @@ a {
     margin-left: 10%;
 }
 
+.img-contacto {
+    display: grid;
+    margin: 0 auto;
+    width: 7%;
+}
+
+.img-dispositivos{
+    display: grid;
+    margin: 0 auto;
+}
+
+.img-tienda {
+    display: grid;
+    margin: 0 auto;
+    width: 60%;
+}
+
 .titulo{
     text-align: center;
     font-size: 333%;
@@ -226,6 +247,82 @@ a {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     align-items: center;
+}
+
+.descargas {
+    text-align: center;
+}
+
+.descargafotos {
+    display: grid;
+    width: 40%;
+    margin: 0 auto;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    align-items: center;
+    grid-template-columns: repeat(2, 1fr);
+    padding: 10px;
+    text-align: center;
+}
+
+.contacto {
+    display: grid;
+    width: 95%;
+    margin: 0 auto;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    align-items: center;
+    grid-template-columns: repeat(2, 1fr);
+    padding: 10px;
+    text-align: center;
+    gap: 5%;
+}
+
+.infocontacto {
+    border-radius: 10px;
+    background-color: var(--card-bg);
+    gap: 10%;
+    padding: 5%;
+}
+
+.infocontacto a{
+    color: var(--primary-dark);
+}
+
+.infocontacto a:hover{
+    color: var(--primary-color);
+}
+
+.footer {
+    width: 95%;
+    margin: 0 auto;
+    background-color: var(--primary-color);
+    border-radius: 10px;
+}
+
+.footer-content {
+    width: 97%;
+    margin: 0 auto;
+}
+
+.titulo-footer {
+    padding-top: 2%;
+    font-size: xx-large;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.texto-footer {
+    padding-bottom: 2%;
+    font-size: large;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.footer-media {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    justify-self: end;
 }
 /* Responsive */
 
