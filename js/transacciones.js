@@ -94,7 +94,6 @@ class TransaccionesManager {
 
 const transaccionesManager = new TransaccionesManager();
 
-// Agregar al final de transacciones.js
 class NotificationsManager {
     constructor() {
         this.notificaciones = this.loadNotificaciones();

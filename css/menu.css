@@ -310,6 +310,7 @@ a {
     font-size: xx-large;
     font-weight: bold;
     color: var(--text-primary);
+    width: 15%;
 }
 
 .texto-footer {
@@ -323,6 +324,10 @@ a {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     justify-self: end;
+}
+
+.quote {
+    color: white;
 }
 /* Responsive */
 
