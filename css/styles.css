@@ -647,6 +647,35 @@ body {
     opacity: 0.5;
 }
 
+.user-menu {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    width: 280px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+    padding: 12px;
+    display: none;
+    z-index: 1200;
+}
+
+.user-menu.active {
+    display: block;
+}
+
+.user-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.user-menu-content p {
+    margin: 8px 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .grupos-grid {

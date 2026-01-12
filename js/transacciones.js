@@ -1,145 +1,129 @@
-// transacciones.js - Gestión de transacciones
+// transacciones.js - Gestión de transacciones + notificaciones (API Node/Express + MySQL)
 class TransaccionesManager {
-    constructor() {
-        this.grupos = gruposManager.grupos;
-    }
+    constructor() { }
 
-    crearTransaccion(grupoId, concepto, monto, tipo, participantes) {
+    async crearTransaccion(grupoId, concepto, monto, tipo, participantes) {
         const currentUser = authManager.getCurrentUser();
-        const grupo = gruposManager.obtenerGrupo(grupoId);
+        const gid = Number(grupoId);
 
-        if (!grupo) {
-            throw new Error('Grupo no encontrado');
-        }
+        // Si no te pasan participantes y es gasto "equitativo", tu JS original repartía entre miembros del grupo. [file:109]
+        // Para replicarlo, necesitamos el detalle del grupo (miembros).
+        let participantesFinal = participantes || [];
 
-        const nuevaTransaccion = {
-            id: Date.now().toString(),
-            grupoId,
-            pagadorId: currentUser.id,
-            pagadorNombre: currentUser.nombre,
-            concepto,
-            monto: parseFloat(monto),
-            tipo,
-            participantes: participantes || [],
-            estado: 'pendiente',
-            fecha: new Date().toISOString()
-        };
+        if (tipo === "gasto" && (!participantesFinal || participantesFinal.length === 0)) {
+            // Cargar miembros del grupo para calcular reparto
+            const detalle = await gruposManager.cargarDetalleGrupo(grupoId);
+            const miembros = detalle.miembros || [];
 
-        // Si es gasto y se divide equitativamente
-        if (tipo === 'gasto' && participantes.length === 0) {
-            const montoPorPersona = nuevaTransaccion.monto / grupo.miembros.length;
-            nuevaTransaccion.participantes = grupo.miembros.map(m => ({
-                usuarioId: m.id,
-                usuarioNombre: m.nombre,
-                montoDebe: montoPorPersona,
-                pagado: m.id === currentUser.id
+            const montoPorPersona = Number(monto) / (miembros.length || 1);
+
+            participantesFinal = miembros.map(m => ({
+                id_usuario: Number(m.id_usuario),
+                monto_debe: montoPorPersona,
+                pagado: Number(m.id_usuario) === Number(currentUser.id)
+            }));
+        } else {
+            // Normaliza formato si te llega como {usuarioId, montoDebe, pagado}
+            participantesFinal = participantesFinal.map(p => ({
+                id_usuario: Number(p.id_usuario ?? p.usuarioId),
+                monto_debe: Number(p.monto_debe ?? p.montoDebe ?? 0),
+                pagado: !!p.pagado
             }));
         }
 
-        grupo.transacciones.push(nuevaTransaccion);
-        gruposManager.saveGrupos();
-
-        // Crear notificaciones
-        grupo.miembros.forEach(m => {
-            if (m.id !== currentUser.id) {
-                notificationsManager.crearNotificacion(
-                    m.id,
-                    `${currentUser.nombre} añadió "${concepto}" por €${monto} en "${grupo.nombre}"`
-                );
-            }
+        const resp = await fetch(`${API_URL}/transacciones`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                id_grupo: gid,
+                tipo,
+                concepto,
+                monto: Number(monto),
+                id_pagador: Number(currentUser.id),
+                id_receptor: null,
+                participantes: participantesFinal
+            })
         });
 
-        return nuevaTransaccion;
-    }
-
-    obtenerTransaccionesUsuario(userId) {
-        const transacciones = [];
-
-        this.grupos.forEach(grupo => {
-            if (grupo.miembros.some(m => m.id === userId)) {
-                grupo.transacciones.forEach(t => {
-                    transacciones.push({
-                        ...t,
-                        grupoNombre: grupo.nombre
-                    });
-                });
-            }
-        });
-
-        return transacciones.sort((a, b) =>
-            new Date(b.fecha) - new Date(a.fecha)
-        );
-    }
-
-    marcarComoPagada(grupoId, transaccionId, participanteId) {
-        const grupo = gruposManager.obtenerGrupo(grupoId);
-        const transaccion = grupo.transacciones.find(t => t.id === transaccionId);
-
-        if (transaccion) {
-            const participante = transaccion.participantes.find(p => p.usuarioId === participanteId);
-            if (participante) {
-                participante.pagado = true;
-
-                // Verificar si todos han pagado
-                const todosPagados = transaccion.participantes.every(p => p.pagado);
-                if (todosPagados) {
-                    transaccion.estado = 'completada';
-                }
-
-                gruposManager.saveGrupos();
-            }
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || "No se pudo crear la transacción");
         }
+
+        return await resp.json(); // {id_transaccion}
+    }
+
+    async obtenerTransaccionesUsuario(userId) {
+        const resp = await fetch(`${API_URL}/transacciones?id_usuario=${encodeURIComponent(userId)}`);
+        if (!resp.ok) throw new Error("No se pudieron cargar transacciones");
+
+        const tx = await resp.json();
+
+        // Normaliza a tu estructura usada en app.js (grupoNombre, pagadorNombre, fecha...) [file:107]
+        return tx.map(t => ({
+            id: String(t.id_transaccion),
+            grupoId: String(t.id_grupo),
+            grupoNombre: t.nombre_grupo,
+            pagadorId: String(t.id_pagador),
+            pagadorNombre: t.nombre_pagador,
+            concepto: t.concepto,
+            monto: Number(t.monto),
+            tipo: t.tipo,
+            estado: t.estado,
+            fecha: t.fecha_creacion
+        }));
+    }
+
+    async marcarComoPagada(grupoId, transaccionId, participanteId) {
+        const resp = await fetch(
+            `${API_URL}/transacciones/${encodeURIComponent(transaccionId)}/participantes/${encodeURIComponent(participanteId)}`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pagado: true })
+            }
+        );
+
+        if (!resp.ok) throw new Error("No se pudo marcar como pagada");
+        return await resp.json();
     }
 }
 
 const transaccionesManager = new TransaccionesManager();
 
-// Agregar al final de transacciones.js
 class NotificationsManager {
-    constructor() {
-        this.notificaciones = this.loadNotificaciones();
+    constructor() { }
+
+    async obtenerNotificacionesUsuario(usuarioId) {
+        const resp = await fetch(`${API_URL}/notificaciones?id_usuario=${encodeURIComponent(usuarioId)}`);
+        if (!resp.ok) throw new Error("No se pudieron cargar notificaciones");
+
+        const notifs = await resp.json();
+
+        // Normaliza a tu estructura usada en app.js [file:107]
+        return notifs.map(n => ({
+            id: String(n.id_notificacion),
+            usuarioId: String(n.id_usuario),
+            mensaje: n.mensaje,
+            leida: !!n.leida,
+            fecha: n.fecha_creacion
+        }));
     }
 
-    loadNotificaciones() {
-        const notifs = localStorage.getItem('notificaciones');
-        return notifs ? JSON.parse(notifs) : [];
+    async marcarComoLeida(notifId) {
+        const resp = await fetch(`${API_URL}/notificaciones/${encodeURIComponent(notifId)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+        });
+
+        if (!resp.ok) throw new Error("No se pudo marcar la notificación como leída");
+        return await resp.json();
     }
 
-    saveNotificaciones() {
-        localStorage.setItem('notificaciones', JSON.stringify(this.notificaciones));
-    }
-
-    crearNotificacion(usuarioId, mensaje) {
-        const nuevaNotif = {
-            id: Date.now().toString(),
-            usuarioId,
-            mensaje,
-            leida: false,
-            fecha: new Date().toISOString()
-        };
-
-        this.notificaciones.push(nuevaNotif);
-        this.saveNotificaciones();
-    }
-
-    obtenerNotificacionesUsuario(usuarioId) {
-        return this.notificaciones
-            .filter(n => n.usuarioId === usuarioId)
-            .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    }
-
-    marcarComoLeida(notifId) {
-        const notif = this.notificaciones.find(n => n.id === notifId);
-        if (notif) {
-            notif.leida = true;
-            this.saveNotificaciones();
-        }
-    }
-
-    contarNoLeidas(usuarioId) {
-        return this.notificaciones.filter(n =>
-            n.usuarioId === usuarioId && !n.leida
-        ).length;
+    async contarNoLeidas(usuarioId) {
+        const notifs = await this.obtenerNotificacionesUsuario(usuarioId);
+        return notifs.filter(n => !n.leida).length;
     }
 }
 

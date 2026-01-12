@@ -64,17 +64,39 @@
         <header class="app-header">
             <div class="header-content">
                 <h1><i class="fas fa-wallet"></i> Mis Grupos</h1>
+
+                <!-- Acciones (sin duplicados) -->
                 <div class="header-actions">
-                    <button class="btn-icon" id="notificationsBtn">
+                    <button class="btn-icon" id="notificationsBtn" title="Notificaciones">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge">0</span>
                     </button>
-                    <button class="btn-icon" id="logoutBtn">
+
+                    <!-- NUEVO: botón para menú de usuario -->
+                    <button class="btn-icon" id="userMenuBtn" title="Usuario">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+
+                    <button class="btn-icon" id="logoutBtn" title="Cerrar sesión">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </div>
             </div>
         </header>
+
+        <!-- NUEVO: Menú simple de usuario -->
+        <div id="userMenu" class="user-menu">
+            <div class="user-menu-header">
+                <strong>Usuario</strong>
+                <button class="btn-close" id="closeUserMenu" title="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="user-menu-content">
+                <p><strong>Nombre:</strong> <span id="userMenuNombre">-</span></p>
+                <p><strong>Email:</strong> <span id="userMenuEmail">-</span></p>
+            </div>
+        </div>
 
         <!-- Panel de Notificaciones -->
         <div id="notificationsPanel" class="notifications-panel">
@@ -228,10 +250,10 @@
         </div>
     </div>
 
-    <script src="js/auth.js"></script>
-    <script src="js/grupos.js"></script>
-    <script src="js/transacciones.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/auth.js" defer></script>
+    <script src="js/grupos.js" defer></script>
+    <script src="js/transacciones.js" defer></script>
+    <script src="js/app.js" defer></script>
 </body>
 
 </html>

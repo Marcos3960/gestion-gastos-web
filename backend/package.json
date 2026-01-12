@@ -1,0 +1,15 @@
+{
+  "name": "apaxas-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "servidor.js",
+  "scripts": {
+    "start": "node servidor.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "mysql2": "^3.16.0"
+  }
+}
