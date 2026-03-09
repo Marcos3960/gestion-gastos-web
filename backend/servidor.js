@@ -1,4 +1,5 @@
-// servidor.js - API Node/Express + MySQL/MariaDB (XAMPP)
+﻿// servidor.js - API Node/Express + MySQL/MariaDB (XAMPP)
+
 import express from "express";
 import cors from "cors";
 import { poolBD } from "./bd.js";
@@ -9,6 +10,10 @@ app.use(cors());
 app.use(express.json());
 
 const PUERTO = Number(process.env.PUERTO || 3000);
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5500";
+
+// Envuelve rutas async para capturar errores sin crashear el servidor
+const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // (Mantiene el comportamiento de tu front anterior: btoa(password))
 function base64(texto) {
@@ -16,55 +21,57 @@ function base64(texto) {
 }
 
 // Healthcheck
-app.get("/api/health", async (req, res) => {
+app.get("/api/health", ah(async (req, res) => {
     const [r] = await poolBD.execute("SELECT 1 AS ok");
     res.json(r[0]);
-});
+}));
 
 /* =========================
    AUTH
 ========================= */
 
 // Registro
-app.post("/api/usuarios", async (req, res) => {
-    const { nombre, correo_electronico, contrasena } = req.body;
-
-    if (!nombre || !correo_electronico || !contrasena) {
+app.post("/api/usuarios", ah(async (req, res) => {
+    const { nombre, nombre_usuario, correo_electronico, contrasena } = req.body;
+    if (!nombre || !nombre_usuario || !correo_electronico || !contrasena) {
         return res.status(400).json({ error: "Faltan campos" });
     }
 
-    const [existe] = await poolBD.execute(
+    const [existeEmail] = await poolBD.execute(
         "SELECT id_usuario FROM usuario WHERE correo_electronico = ?",
         [correo_electronico]
     );
-
-    if (existe.length) {
+    if (existeEmail.length) {
         return res.status(409).json({ error: "El email ya está registrado" });
     }
 
-    const hash = base64(contrasena);
-
-    const [r] = await poolBD.execute(
-        "INSERT INTO usuario (nombre, correo_electronico, hash_contrasena) VALUES (?,?,?)",
-        [nombre, correo_electronico, hash]
+    const [existeUsuario] = await poolBD.execute(
+        "SELECT id_usuario FROM usuario WHERE nombre_usuario = ?",
+        [nombre_usuario]
     );
+    if (existeUsuario.length) {
+        return res.status(409).json({ error: "El nombre de usuario ya está en uso" });
+    }
 
+    const hash = base64(contrasena);
+    const [r] = await poolBD.execute(
+        "INSERT INTO usuario (nombre, nombre_usuario, correo_electronico, hash_contrasena) VALUES (?,?,?,?)",
+        [nombre, nombre_usuario, correo_electronico, hash]
+    );
     res.status(201).json({ id_usuario: r.insertId });
-});
+}));
 
 // Login
-app.post("/api/login", async (req, res) => {
-    const { correo_electronico, contrasena } = req.body;
-
-    if (!correo_electronico || !contrasena) {
+app.post("/api/login", ah(async (req, res) => {
+    const { identificador, contrasena } = req.body;
+    if (!identificador || !contrasena) {
         return res.status(400).json({ error: "Faltan campos" });
     }
 
     const [filas] = await poolBD.execute(
-        "SELECT id_usuario, nombre, correo_electronico, hash_contrasena FROM usuario WHERE correo_electronico = ?",
-        [correo_electronico]
+        "SELECT id_usuario, nombre, nombre_usuario, correo_electronico, hash_contrasena FROM usuario WHERE correo_electronico = ? OR nombre_usuario = ?",
+        [identificador, identificador]
     );
-
     if (!filas.length) return res.status(401).json({ error: "Credenciales incorrectas" });
 
     const u = filas[0];
@@ -81,39 +88,109 @@ app.post("/api/login", async (req, res) => {
     res.json({
         id_usuario: u.id_usuario,
         nombre: u.nombre,
+        nombre_usuario: u.nombre_usuario,
         correo_electronico: u.correo_electronico
     });
-});
+}));
+
+// Actualizar usuario
+app.patch("/api/usuarios/:id_usuario", ah(async (req, res) => {
+    const id_usuario = Number(req.params.id_usuario);
+    const { nombre, nombre_usuario, correo_electronico, contrasena } = req.body;
+
+    const updates = [];
+    const values = [];
+
+    if (nombre) {
+        updates.push("nombre = ?");
+        values.push(nombre);
+    }
+    if (nombre_usuario) {
+        // Comprobar que no está en uso por otro usuario
+        const [dup] = await poolBD.execute(
+            "SELECT id_usuario FROM usuario WHERE nombre_usuario = ? AND id_usuario != ?",
+            [nombre_usuario, id_usuario]
+        );
+        if (dup.length) return res.status(409).json({ error: "El nombre de usuario ya está en uso" });
+        updates.push("nombre_usuario = ?");
+        values.push(nombre_usuario);
+    }
+    if (correo_electronico) {
+        updates.push("correo_electronico = ?");
+        values.push(correo_electronico);
+    }
+    if (contrasena) {
+        updates.push("hash_contrasena = ?");
+        values.push(base64(contrasena));
+    }
+
+    if (updates.length === 0) {
+        return res.status(400).json({ error: "No hay campos para actualizar" });
+    }
+
+    values.push(id_usuario);
+
+    await poolBD.execute(
+        `UPDATE usuario SET ${updates.join(", ")} WHERE id_usuario = ?`,
+        values
+    );
+
+    // Devolver datos actualizados
+    const [[updated]] = await poolBD.execute(
+        "SELECT id_usuario, nombre, nombre_usuario, correo_electronico FROM usuario WHERE id_usuario = ?",
+        [id_usuario]
+    );
+
+    res.json(updated);
+}));
+
+// Obtener un usuario por ID
+app.get("/api/usuarios/:id_usuario", ah(async (req, res) => {
+    const id_usuario = Number(req.params.id_usuario);
+    const [[usuario]] = await poolBD.execute(
+        "SELECT id_usuario, nombre, nombre_usuario, correo_electronico FROM usuario WHERE id_usuario = ?",
+        [id_usuario]
+    );
+    if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+    res.json(usuario);
+}));
+
+// Obtener todos los usuarios (para select de miembros)
+app.get("/api/usuarios", ah(async (req, res) => {
+    const [usuarios] = await poolBD.execute(
+        "SELECT id_usuario, nombre, nombre_usuario, correo_electronico FROM usuario ORDER BY nombre ASC"
+    );
+    res.json(usuarios);
+}));
 
 /* =========================
    GRUPOS
 ========================= */
 
 // Listar grupos de un usuario
-app.get("/api/grupos", async (req, res) => {
+app.get("/api/grupos", ah(async (req, res) => {
     const id_usuario = Number(req.query.id_usuario);
     if (!id_usuario) return res.status(400).json({ error: "id_usuario requerido" });
 
     const [grupos] = await poolBD.execute(
-        `SELECT g.id_grupo, g.nombre, g.descripcion, g.id_admin, g.fecha_creacion
+        `SELECT g.id_grupo, g.nombre, g.descripcion, g.divisa, g.id_admin, g.fecha_creacion
      FROM grupo g
      JOIN miembro_grupo mg ON mg.id_grupo = g.id_grupo
      WHERE mg.id_usuario = ?
      ORDER BY g.fecha_creacion DESC`,
         [id_usuario]
     );
-
     res.json(grupos);
-});
+}));
 
 // Crear grupo + insertar admin en miembro_grupo
-app.post("/api/grupos", async (req, res) => {
-    const { nombre, descripcion, id_admin } = req.body;
+app.post("/api/grupos", ah(async (req, res) => {
+    const { nombre, descripcion, divisa, id_admin } = req.body;
     if (!nombre || !id_admin) return res.status(400).json({ error: "Faltan campos" });
 
     const [r] = await poolBD.execute(
-        "INSERT INTO grupo (nombre, descripcion, id_admin) VALUES (?,?,?)",
-        [nombre, descripcion || null, Number(id_admin)]
+        "INSERT INTO grupo (nombre, descripcion, divisa, id_admin) VALUES (?,?,?,?)",
+        [nombre, descripcion || null, divisa || 'EUR', Number(id_admin)]
     );
 
     await poolBD.execute(
@@ -122,43 +199,36 @@ app.post("/api/grupos", async (req, res) => {
     );
 
     res.status(201).json({ id_grupo: r.insertId });
-});
+}));
 
-// Añadir miembros a un grupo por correo (si existen usuarios)
-app.post("/api/grupos/:id_grupo/miembros", async (req, res) => {
+// Añadir miembros a un grupo por ID de usuario
+app.post("/api/grupos/:id_grupo/miembros", ah(async (req, res) => {
     const id_grupo = Number(req.params.id_grupo);
-    const { correos } = req.body;
+    const { usuarios_ids } = req.body;
 
     if (!id_grupo) return res.status(400).json({ error: "id_grupo inválido" });
-    if (!Array.isArray(correos)) return res.status(400).json({ error: "correos debe ser array" });
+    if (!Array.isArray(usuarios_ids)) return res.status(400).json({ error: "usuarios_ids debe ser array" });
 
-    for (const correo of correos) {
-        const [u] = await poolBD.execute(
-            "SELECT id_usuario FROM usuario WHERE correo_electronico = ?",
-            [correo]
-        );
-
-        if (!u.length) continue;
-
+    for (const id_usuario of usuarios_ids) {
         // IGNORE evita duplicados si ya era miembro
         await poolBD.execute(
             "INSERT IGNORE INTO miembro_grupo (id_grupo, id_usuario, rol) VALUES (?,?, 'miembro')",
-            [id_grupo, u[0].id_usuario]
+            [id_grupo, Number(id_usuario)]
         );
     }
 
     res.json({ ok: true });
-});
+}));
 
 // Detalle de grupo (grupo + miembros + transacciones + participantes por transacción)
-app.get("/api/grupos/:id_grupo", async (req, res) => {
+app.get("/api/grupos/:id_grupo", ah(async (req, res) => {
     const id_grupo = Number(req.params.id_grupo);
 
     const [[grupo]] = await poolBD.execute("SELECT * FROM grupo WHERE id_grupo = ?", [id_grupo]);
     if (!grupo) return res.status(404).json({ error: "Grupo no encontrado" });
 
     const [miembros] = await poolBD.execute(
-        `SELECT u.id_usuario, u.nombre, u.correo_electronico, mg.rol
+        `SELECT u.id_usuario, u.nombre, u.nombre_usuario, u.correo_electronico, mg.rol
      FROM miembro_grupo mg
      JOIN usuario u ON u.id_usuario = mg.id_usuario
      WHERE mg.id_grupo = ?`,
@@ -203,14 +273,73 @@ app.get("/api/grupos/:id_grupo", async (req, res) => {
     }));
 
     res.json({ grupo, miembros, transacciones: transaccionesConParticipantes });
-});
+}));
+
+// Eliminar grupo (solo admin)
+app.delete("/api/grupos/:id_grupo", ah(async (req, res) => {
+    const id_grupo = Number(req.params.id_grupo);
+    const { id_usuario } = req.body;
+
+    const [[grupo]] = await poolBD.execute(
+        "SELECT id_admin FROM grupo WHERE id_grupo = ?",
+        [id_grupo]
+    );
+
+    if (!grupo) return res.status(404).json({ error: "Grupo no encontrado" });
+    if (Number(grupo.id_admin) !== Number(id_usuario)) {
+        return res.status(403).json({ error: "Solo el admin puede eliminar el grupo" });
+    }
+
+    // Eliminar en cascada: participantes, transacciones, notificaciones, miembros, grupo
+    await poolBD.execute(
+        "DELETE pt FROM participante_transaccion pt JOIN transaccion t ON pt.id_transaccion = t.id_transaccion WHERE t.id_grupo = ?",
+        [id_grupo]
+    );
+    await poolBD.execute("DELETE FROM transaccion WHERE id_grupo = ?", [id_grupo]);
+    await poolBD.execute("DELETE FROM miembro_grupo WHERE id_grupo = ?", [id_grupo]);
+    await poolBD.execute("DELETE FROM grupo WHERE id_grupo = ?", [id_grupo]);
+
+    res.json({ ok: true });
+}));
+
+// Eliminar miembro del grupo (admin o el mismo usuario)
+app.delete("/api/grupos/:id_grupo/miembros/:id_usuario", ah(async (req, res) => {
+    const id_grupo = Number(req.params.id_grupo);
+    const id_usuario_eliminar = Number(req.params.id_usuario);
+    const { id_usuario_solicitante } = req.body;
+
+    const [[grupo]] = await poolBD.execute(
+        "SELECT id_admin FROM grupo WHERE id_grupo = ?",
+        [id_grupo]
+    );
+
+    if (!grupo) return res.status(404).json({ error: "Grupo no encontrado" });
+
+    const esAdmin = Number(grupo.id_admin) === Number(id_usuario_solicitante);
+    const esMismoUsuario = Number(id_usuario_eliminar) === Number(id_usuario_solicitante);
+
+    if (!esAdmin && !esMismoUsuario) {
+        return res.status(403).json({ error: "Sin permisos" });
+    }
+
+    if (Number(id_usuario_eliminar) === Number(grupo.id_admin)) {
+        return res.status(400).json({ error: "El admin no puede salir del grupo. Debe eliminarlo o transferir el rol." });
+    }
+
+    await poolBD.execute(
+        "DELETE FROM miembro_grupo WHERE id_grupo = ? AND id_usuario = ?",
+        [id_grupo, id_usuario_eliminar]
+    );
+
+    res.json({ ok: true });
+}));
 
 /* =========================
    TRANSACCIONES
 ========================= */
 
 // Crear transacción + participantes
-app.post("/api/transacciones", async (req, res) => {
+app.post("/api/transacciones", ah(async (req, res) => {
     const { id_grupo, tipo, concepto, monto, id_pagador, id_receptor, participantes } = req.body;
 
     if (!id_grupo || !tipo || !concepto || monto == null || !id_pagador) {
@@ -270,10 +399,10 @@ app.post("/api/transacciones", async (req, res) => {
     }
 
     res.status(201).json({ id_transaccion });
-});
+}));
 
 // Transacciones visibles para un usuario (por pertenecer a sus grupos)
-app.get("/api/transacciones", async (req, res) => {
+app.get("/api/transacciones", ah(async (req, res) => {
     const id_usuario = Number(req.query.id_usuario);
     if (!id_usuario) return res.status(400).json({ error: "id_usuario requerido" });
 
@@ -287,12 +416,11 @@ app.get("/api/transacciones", async (req, res) => {
      ORDER BY t.fecha_creacion DESC`,
         [id_usuario]
     );
-
     res.json(tx);
-});
+}));
 
 // Marcar participante como pagado y completar si todos pagaron
-app.patch("/api/transacciones/:id_transaccion/participantes/:id_usuario", async (req, res) => {
+app.patch("/api/transacciones/:id_transaccion/participantes/:id_usuario", ah(async (req, res) => {
     const id_transaccion = Number(req.params.id_transaccion);
     const id_usuario = Number(req.params.id_usuario);
     const { pagado } = req.body;
@@ -319,13 +447,87 @@ app.patch("/api/transacciones/:id_transaccion/participantes/:id_usuario", async 
     }
 
     res.json({ ok: true });
-});
+}));
+
+// Actualizar transacción
+app.put("/api/transacciones/:id_transaccion", ah(async (req, res) => {
+    try {
+        const id_transaccion = Number(req.params.id_transaccion);
+        const { concepto, monto, id_pagador, participantes } = req.body;
+
+        console.log("Actualizando transacción:", id_transaccion, req.body);
+
+        // Verificar que la transacción existe
+        const [[transaccion]] = await poolBD.execute(
+            "SELECT id_transaccion, id_grupo FROM transaccion WHERE id_transaccion = ?",
+            [id_transaccion]
+        );
+
+        if (!transaccion) {
+            return res.status(404).json({ error: "Transacción no encontrada" });
+        }
+
+        // Actualizar los campos de la transacción
+        const updates = [];
+        const values = [];
+
+        if (concepto !== undefined) {
+            updates.push("concepto = ?");
+            values.push(concepto);
+        }
+        if (monto !== undefined) {
+            updates.push("monto = ?");
+            values.push(Number(monto));
+        }
+        if (id_pagador !== undefined) {
+            updates.push("id_pagador = ?");
+            values.push(Number(id_pagador));
+        }
+
+        if (updates.length > 0) {
+            values.push(id_transaccion);
+            await poolBD.execute(
+                `UPDATE transaccion SET ${updates.join(", ")} WHERE id_transaccion = ?`,
+                values
+            );
+        }
+
+        // Si se proveen participantes, actualizar la tabla participante_transaccion
+        if (Array.isArray(participantes)) {
+            // Eliminar participantes antiguos
+            await poolBD.execute(
+                "DELETE FROM participante_transaccion WHERE id_transaccion = ?",
+                [id_transaccion]
+            );
+
+            // Insertar nuevos participantes
+            for (const p of participantes) {
+                await poolBD.execute(
+                    `INSERT INTO participante_transaccion (id_transaccion, id_usuario, monto_debe, pagado, fecha_pago)
+                     VALUES (?,?,?,?,?)`,
+                    [
+                        id_transaccion,
+                        Number(p.id_usuario),
+                        Number(p.monto_debe ?? 0),
+                        !!p.pagado,
+                        p.pagado ? new Date() : null
+                    ]
+                );
+            }
+        }
+
+        res.json({ ok: true, id_transaccion });
+    } catch (error) {
+        console.error("Error al actualizar transacción:", error);
+        res.status(500).json({ error: "Error al actualizar la transacción: " + error.message });
+    }
+}));
 
 /* =========================
    NOTIFICACIONES
 ========================= */
 
-app.get("/api/notificaciones", async (req, res) => {
+app.get("/api/notificaciones", ah(async (req, res) => {
     const id_usuario = Number(req.query.id_usuario);
     if (!id_usuario) return res.status(400).json({ error: "id_usuario requerido" });
 
@@ -335,19 +537,27 @@ app.get("/api/notificaciones", async (req, res) => {
      ORDER BY fecha_creacion DESC`,
         [id_usuario]
     );
-
     res.json(notifs);
-});
+}));
 
-app.patch("/api/notificaciones/:id_notificacion", async (req, res) => {
+app.patch("/api/notificaciones/:id_notificacion", ah(async (req, res) => {
     const id_notificacion = Number(req.params.id_notificacion);
-
     await poolBD.execute(
         "UPDATE notificacion SET leida = TRUE WHERE id_notificacion = ?",
         [id_notificacion]
     );
-
     res.json({ ok: true });
+}));
+
+// Middleware global de errores
+app.use((err, req, res, next) => {
+    console.error("[ERROR]", err.message);
+    res.status(500).json({ error: "Error interno del servidor" });
+});
+
+// Evitar que el proceso muera por promesas no capturadas
+process.on("unhandledRejection", (err) => {
+    console.error("[unhandledRejection]", err?.message || err);
 });
 
 app.listen(PUERTO, () => {

@@ -2,28 +2,23 @@
 class TransaccionesManager {
     constructor() { }
 
-    async crearTransaccion(grupoId, concepto, monto, tipo, participantes) {
+    async crearTransaccion(grupoId, concepto, monto, tipo, participantes, idPagador, fechaTransaccion) {
         const currentUser = authManager.getCurrentUser();
+        const pagadorFinal = idPagador ? Number(idPagador) : Number(currentUser.id);
         const gid = Number(grupoId);
 
-        // Si no te pasan participantes y es gasto "equitativo", tu JS original repartía entre miembros del grupo. [file:109]
-        // Para replicarlo, necesitamos el detalle del grupo (miembros).
         let participantesFinal = participantes || [];
 
         if (tipo === "gasto" && (!participantesFinal || participantesFinal.length === 0)) {
-            // Cargar miembros del grupo para calcular reparto
             const detalle = await gruposManager.cargarDetalleGrupo(grupoId);
             const miembros = detalle.miembros || [];
-
             const montoPorPersona = Number(monto) / (miembros.length || 1);
-
             participantesFinal = miembros.map(m => ({
                 id_usuario: Number(m.id_usuario),
                 monto_debe: montoPorPersona,
-                pagado: Number(m.id_usuario) === Number(currentUser.id)
+                pagado: Number(m.id_usuario) === pagadorFinal
             }));
         } else {
-            // Normaliza formato si te llega como {usuarioId, montoDebe, pagado}
             participantesFinal = participantesFinal.map(p => ({
                 id_usuario: Number(p.id_usuario ?? p.usuarioId),
                 monto_debe: Number(p.monto_debe ?? p.montoDebe ?? 0),
@@ -39,27 +34,50 @@ class TransaccionesManager {
                 tipo,
                 concepto,
                 monto: Number(monto),
-                id_pagador: Number(currentUser.id),
+                id_pagador: pagadorFinal,
                 id_receptor: null,
-                participantes: participantesFinal
+                participantes: participantesFinal,
+                fecha_transaccion: fechaTransaccion || null
             })
         });
-
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
             throw new Error(err.error || "No se pudo crear la transacción");
         }
 
-        return await resp.json(); // {id_transaccion}
+        return await resp.json();
+    }
+
+    async actualizarTransaccion(transaccionId, concepto, monto, idPagador, participantes, fechaTransaccion) {
+        const resp = await fetch(`${API_URL}/transacciones/${encodeURIComponent(transaccionId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                concepto,
+                monto: Number(monto),
+                id_pagador: Number(idPagador),
+                participantes: participantes.map(p => ({
+                    id_usuario: Number(p.id_usuario ?? p.usuarioId),
+                    monto_debe: Number(p.monto_debe ?? p.montoDebe ?? 0),
+                    pagado: !!p.pagado
+                })),
+                fecha_transaccion: fechaTransaccion || null
+            })
+        });
+        
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || "No se pudo actualizar la transacción");
+        }
+
+        return await resp.json();
     }
 
     async obtenerTransaccionesUsuario(userId) {
         const resp = await fetch(`${API_URL}/transacciones?id_usuario=${encodeURIComponent(userId)}`);
         if (!resp.ok) throw new Error("No se pudieron cargar transacciones");
-
         const tx = await resp.json();
 
-        // Normaliza a tu estructura usada en app.js (grupoNombre, pagadorNombre, fecha...) [file:107]
         return tx.map(t => ({
             id: String(t.id_transaccion),
             grupoId: String(t.id_grupo),
@@ -70,7 +88,7 @@ class TransaccionesManager {
             monto: Number(t.monto),
             tipo: t.tipo,
             estado: t.estado,
-            fecha: t.fecha_creacion
+            fecha: t.fecha_transaccion || t.fecha_creacion
         }));
     }
 
@@ -83,7 +101,6 @@ class TransaccionesManager {
                 body: JSON.stringify({ pagado: true })
             }
         );
-
         if (!resp.ok) throw new Error("No se pudo marcar como pagada");
         return await resp.json();
     }
@@ -97,10 +114,8 @@ class NotificationsManager {
     async obtenerNotificacionesUsuario(usuarioId) {
         const resp = await fetch(`${API_URL}/notificaciones?id_usuario=${encodeURIComponent(usuarioId)}`);
         if (!resp.ok) throw new Error("No se pudieron cargar notificaciones");
-
         const notifs = await resp.json();
 
-        // Normaliza a tu estructura usada en app.js [file:107]
         return notifs.map(n => ({
             id: String(n.id_notificacion),
             usuarioId: String(n.id_usuario),
@@ -116,7 +131,6 @@ class NotificationsManager {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({})
         });
-
         if (!resp.ok) throw new Error("No se pudo marcar la notificación como leída");
         return await resp.json();
     }

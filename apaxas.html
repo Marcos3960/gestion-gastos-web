@@ -1,177 +1,328 @@
-<!-- Demo tecnica, prueba para ver como sería la funcionalidad de la aplcicación-->
-
 <!DOCTYPE html>
 <html lang="es">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Gastos Grupales</title>
+    <title>Apaxas - Gestión de Gastos Compartidos</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/menu.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
-    <!-- Pantalla de Login -->
-    <div id="loginScreen" class="screen active">
-        <div class="login-container">
-            <div class="login-card">
-                <h1><i class="fas fa-wallet"></i> Gestión de Gastos</h1>
+
+    <!-- PANTALLA DE LOGIN -->
+    <div id="loginScreen" class="screen">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1>Apaxas</h1>
+                <p class="subtitle">Gestiona tus gastos compartidos</p>
                 <form id="loginForm">
                     <div class="form-group">
-                        <label for="loginEmail">Email</label>
-                        <input type="email" id="loginEmail" required>
+                        <label for="loginIdentifier">Correo electrónico o nombre de usuario</label>
+                        <input type="text" id="loginIdentifier" required>
                     </div>
+
                     <div class="form-group">
                         <label for="loginPassword">Contraseña</label>
                         <input type="password" id="loginPassword" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
-                    <p class="switch-form">¿No tienes cuenta? <a href="#" id="showRegister">Regístrate</a></p>
+
+                    <button type="submit" class="btn-primary">Iniciar sesión</button>
                 </form>
+
+                <p class="auth-switch">
+                    ¿No tienes cuenta? <a href="#" id="showRegister">Regístrate</a>
+                </p>
             </div>
         </div>
     </div>
 
-    <!-- Pantalla de Registro -->
+    <!-- PANTALLA DE REGISTRO -->
     <div id="registerScreen" class="screen">
-        <div class="login-container">
-            <div class="login-card">
-                <h1><i class="fas fa-user-plus"></i> Registro</h1>
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1>Crear cuenta</h1>
+                <p class="subtitle">Únete a Apaxas</p>
+
                 <form id="registerForm">
                     <div class="form-group">
                         <label for="registerName">Nombre</label>
                         <input type="text" id="registerName" required>
                     </div>
+
                     <div class="form-group">
-                        <label for="registerEmail">Email</label>
+                        <label for="registerUsername">Nombre de usuario</label>
+                        <input type="text" id="registerUsername" required placeholder="ej. juan_garcia">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerEmail">Correo electrónico</label>
                         <input type="email" id="registerEmail" required>
                     </div>
+
                     <div class="form-group">
                         <label for="registerPassword">Contraseña</label>
                         <input type="password" id="registerPassword" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Registrarse</button>
-                    <p class="switch-form">¿Ya tienes cuenta? <a href="#" id="showLogin">Inicia Sesión</a></p>
+
+                    <button type="submit" class="btn-primary">Registrarse</button>
                 </form>
+
+                <p class="auth-switch">
+                    ¿Ya tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
+                </p>
             </div>
         </div>
     </div>
 
-    <!-- Aplicación Principal -->
+    <!-- PANTALLA PRINCIPAL DE LA APP -->
     <div id="appScreen" class="screen">
-        <!-- Header con Notificaciones -->
+
+        <!-- HEADER -->
         <header class="app-header">
-            <div class="header-content">
-                <h1><i class="fas fa-wallet"></i> Mis Grupos</h1>
+            <div class="header-left">
+                <h1>Apaxas</h1>
+            </div>
 
-                <!-- Acciones (sin duplicados) -->
-                <div class="header-actions">
-                    <button class="btn-icon" id="notificationsBtn" title="Notificaciones">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-badge" id="notificationBadge">0</span>
-                    </button>
-
-                    <!-- NUEVO: botón para menú de usuario -->
-                    <button class="btn-icon" id="userMenuBtn" title="Usuario">
-                        <i class="fas fa-user-circle"></i>
-                    </button>
-
-                    <button class="btn-icon" id="logoutBtn" title="Cerrar sesión">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </div>
+            <div class="header-right">
+                <button class="icon-btn" id="notificationsBtn">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge" id="notificationBadge">0</span>
+                </button>
             </div>
         </header>
 
-        <!-- NUEVO: Menú simple de usuario -->
-        <div id="userMenu" class="user-menu">
-            <div class="user-menu-header">
-                <strong>Usuario</strong>
-                <button class="btn-close" id="closeUserMenu" title="Cerrar">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="user-menu-content">
-                <p><strong>Nombre:</strong> <span id="userMenuNombre">-</span></p>
-                <p><strong>Email:</strong> <span id="userMenuEmail">-</span></p>
-            </div>
-        </div>
-
-        <!-- Panel de Notificaciones -->
-        <div id="notificationsPanel" class="notifications-panel">
-            <div class="notifications-header">
-                <h3>Notificaciones</h3>
-                <button class="btn-close" id="closeNotifications">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="notificationsList" class="notifications-list">
-                <!-- Las notificaciones se cargan dinámicamente -->
-            </div>
-        </div>
-
-        <!-- Navegación -->
+        <!-- NAVEGACIÓN -->
         <nav class="app-nav">
             <button class="nav-item active" data-view="grupos">
                 <i class="fas fa-users"></i>
                 <span>Grupos</span>
             </button>
-            <button class="nav-item" data-view="transacciones">
-                <i class="fas fa-exchange-alt"></i>
-                <span>Transacciones</span>
+            <button class="nav-item" data-view="estadisticas">
+                <i class="fas fa-chart-pie"></i>
+                <span>Estadísticas</span>
+            </button>
+            <button class="nav-item" data-view="ajustes">
+                <i class="fas fa-cog"></i>
+                <span>Ajustes</span>
             </button>
         </nav>
 
-        <!-- Vista de Grupos -->
-        <div id="gruposView" class="view active">
-            <div class="container">
-                <div class="section-header">
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="app-main">
+
+            <!-- VISTA: GRUPOS -->
+            <div id="grupos" class="view active">
+                <div class="view-header">
                     <h2>Mis Grupos</h2>
-                    <button class="btn btn-primary" id="btnCrearGrupo">
+                    <button class="btn-primary" id="btnCrearGrupo">
                         <i class="fas fa-plus"></i> Crear Grupo
                     </button>
                 </div>
+
                 <div id="gruposList" class="grupos-grid">
-                    <!-- Los grupos se cargan dinámicamente -->
+                    <!-- Los grupos se cargarán aquí dinámicamente -->
                 </div>
             </div>
-        </div>
 
-        <!-- Vista de Transacciones -->
-        <div id="transaccionesView" class="view">
-            <div class="container">
-                <div class="section-header">
-                    <h2>Historial de Transacciones</h2>
-                    <button class="btn btn-primary" id="btnNuevaTransaccion">
-                        <i class="fas fa-plus"></i> Nueva Transacción
+            <!-- VISTA: DETALLE DE GRUPO -->
+            <div id="detalleGrupo" class="view">
+                <div class="view-header">
+                    <button class="btn-back" id="btnBackToGrupos">
+                        <i class="fas fa-arrow-left"></i> Volver
                     </button>
+                    <div class="grupo-title">
+                        <h2 id="detalleGrupoNombre">Nombre del Grupo</h2>
+                        <span class="badge-divisa" id="detalleGrupoDivisa">EUR</span>
+                    </div>
                 </div>
-                <div class="filter-tabs">
-                    <button class="filter-tab active" data-filter="todas">Todas</button>
-                    <button class="filter-tab" data-filter="pendientes">Pendientes</button>
-                    <button class="filter-tab" data-filter="completadas">Completadas</button>
+
+                <div class="grupo-detalle-container">
+                    <div class="grupo-info-card">
+                        <h3>Descripción</h3>
+                        <p id="detalleGrupoDescripcion">-</p>
+                    </div>
+
+                    <div class="grupo-actions" id="grupoActions">
+                        <!-- Botones se cargan dinámicamente -->
+                    </div>
+
+                    <div class="grupo-section">
+                        <h3><i class="fas fa-users"></i> Miembros</h3>
+                        <div id="detalleGrupoMiembros" class="miembros-list">
+                            <!-- Miembros se cargan aquí -->
+                        </div>
+                    </div>
+
+                    <div class="grupo-section">
+                        <h3><i class="fas fa-balance-scale"></i> Balances</h3>
+                        <div id="detalleGrupoBalances" class="balances-list">
+                            <!-- Balances se cargan aquí -->
+                        </div>
+                    </div>
+
+                    <div class="grupo-section">
+                        <h3><i class="fas fa-receipt"></i> Transacciones</h3>
+                        <div id="detalleGrupoTransacciones" class="transacciones-list">
+                            <!-- Transacciones se cargan aquí -->
+                        </div>
+                    </div>
                 </div>
-                <div id="transaccionesList" class="transacciones-list">
-                    <!-- Las transacciones se cargan dinámicamente -->
+            </div>
+
+            <!-- VISTA: ESTADÍSTICAS -->
+            <div id="estadisticas" class="view">
+                <div class="view-header">
+                    <h2>Estadísticas</h2>
                 </div>
+
+                <div class="stats-container">
+                    <!-- Resumen General -->
+                    <div class="stats-summary">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h4>Total Transacciones</h4>
+                                <p id="statTotalTransacciones" class="stat-value">0</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon success">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h4>Te Deben</h4>
+                                <p id="statTotalTeDeben" class="stat-value">0.00€</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon danger">
+                                <i class="fas fa-arrow-down"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h4>Total Pendiente</h4>
+                                <p id="statTotalPendiente" class="stat-value">0.00€</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historial de Transacciones -->
+                    <div class="stats-history">
+                        <h3>Historial de Transacciones</h3>
+                        <div id="historialTransacciones" class="transactions-history">
+                            <!-- Se cargará dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- Te deben dinero -->
+                    <div class="stats-debts">
+                        <h3>Te deben dinero</h3>
+                        <div id="usuariosDeudores" class="debts-list">
+                            <!-- Se cargará dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- Debes dinero -->
+                    <div class="stats-debts">
+                        <h3>Debes dinero a</h3>
+                        <div id="usuariosAcreedores" class="debts-list">
+                            <!-- Se cargará dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: AJUSTES -->
+            <div id="ajustes" class="view">
+                <div class="view-header">
+                    <h2>Ajustes</h2>
+                </div>
+
+                <div class="settings-container">
+                    <!-- PERFIL -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h3><i class="fas fa-user-circle"></i> Perfil</h3>
+                        </div>
+                        <div class="settings-content">
+                            <div class="profile-card">
+                                <div class="profile-card-banner"></div>
+                                <div class="profile-card-body">
+                                    <div class="profile-card-avatar" id="profileCardAvatar">
+                                        <span id="profileCardInitials">?</span>
+                                    </div>
+                                    <div class="profile-card-info">
+                                        <h4 id="settingsUserName">-</h4>
+                                        <span class="profile-card-username" id="settingsUserUsername">-</span>
+                                    </div>
+                                    <div class="profile-card-fields">
+                                        <div class="profile-card-field">
+                                            <i class="fas fa-envelope"></i>
+                                            <span id="settingsUserEmail">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="profile-card-actions">
+                                <button class="btn-secondary" id="btnEditarPerfilSettings">
+                                    <i class="fas fa-edit"></i> Editar Perfil
+                                </button>
+                                <button class="btn-danger" id="logoutBtn">
+                                    <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- APARIENCIA -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h3><i class="fas fa-palette"></i> Apariencia</h3>
+                        </div>
+                        <div class="settings-content">
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <span>Modo Oscuro</span>
+                                </div>
+                                <label class="theme-switch">
+                                    <input type="checkbox" id="themeToggle">
+                                    <span class="slider">
+                                        <i class="fas fa-sun"></i>
+                                        <i class="fas fa-moon"></i>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- PANEL DE NOTIFICACIONES -->
+        <div id="notificationsPanel" class="side-panel">
+            <div class="panel-header">
+                <h3>Notificaciones</h3>
+                <button class="btn-close" id="closeNotifications">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="notificationsList">
+                <!-- Notificaciones se cargan aquí -->
             </div>
         </div>
 
-        <!-- Vista de Detalle del Grupo -->
-        <div id="grupoDetalleView" class="view">
-            <div class="container">
-                <button class="btn-back" id="btnBackToGrupos">
-                    <i class="fas fa-arrow-left"></i> Volver
-                </button>
-                <div id="grupoDetalleContent">
-                    <!-- El detalle se carga dinámicamente -->
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Modal para Crear Grupo -->
+    <!-- MODALES -->
+
+    <!-- Modal: Crear Grupo -->
     <div id="modalCrearGrupo" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -180,80 +331,221 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+
             <form id="formCrearGrupo">
                 <div class="form-group">
-                    <label for="nombreGrupo">Nombre del Grupo</label>
+                    <label for="nombreGrupo">Nombre del grupo</label>
                     <input type="text" id="nombreGrupo" required>
                 </div>
+
                 <div class="form-group">
-                    <label for="descripcionGrupo">Descripción</label>
+                    <label for="descripcionGrupo">Descripción (opcional)</label>
                     <textarea id="descripcionGrupo" rows="3"></textarea>
                 </div>
+
                 <div class="form-group">
-                    <label for="miembrosGrupo">Miembros (emails separados por comas)</label>
-                    <textarea id="miembrosGrupo" rows="3" placeholder="juan@email.com, maria@email.com"></textarea>
+                    <label for="divisaGrupo">Divisa</label>
+                    <select id="divisaGrupo" required>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="CHF">CHF (Fr)</option>
+                        <option value="CAD">CAD ($)</option>
+                        <option value="AUD">AUD ($)</option>
+                        <option value="MXN">MXN ($)</option>
+                    </select>
                 </div>
+
+                <div class="form-group">
+                    <label for="buscarUsuario">Añadir miembros</label>
+                    <input type="text" id="buscarUsuario" placeholder="Buscar por nombre o correo...">
+                    <div id="resultadosBusqueda" class="search-results"></div>
+                    <div id="miembrosSeleccionados" class="selected-members">
+                        <!-- Miembros seleccionados aparecerán aquí -->
+                    </div>
+                </div>
+
                 <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close="modalCrearGrupo">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Crear Grupo</button>
+                    <button type="button" class="btn-secondary" data-close="modalCrearGrupo">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear Grupo</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal para Nueva Transacción -->
-    <div id="modalNuevaTransaccion" class="modal">
+    <!-- Modal: Añadir Miembros al Grupo -->
+    <div id="modalAñadirMiembros" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Nueva Transacción</h3>
-                <button class="btn-close" data-close="modalNuevaTransaccion">
+                <h3>Añadir Miembros al Grupo</h3>
+                <button class="btn-close" data-close="modalAñadirMiembros">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <form id="formNuevaTransaccion">
+
+            <form id="formAñadirMiembros">
                 <div class="form-group">
-                    <label for="grupoTransaccion">Grupo</label>
-                    <select id="grupoTransaccion" required>
-                        <option value="">Selecciona un grupo</option>
-                    </select>
+                    <label for="buscarUsuarioGrupo">Buscar usuario</label>
+                    <input type="text" id="buscarUsuarioGrupo" placeholder="Buscar por nombre o correo...">
+                    <div id="resultadosBusquedaGrupo" class="search-results"></div>
+                    <div id="miembrosSeleccionadosGrupo" class="selected-members">
+                        <!-- Miembros seleccionados aparecerán aquí -->
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="conceptoTransaccion">Concepto</label>
-                    <input type="text" id="conceptoTransaccion" required placeholder="Ej: Cena, Gasolina, Hotel">
-                </div>
-                <div class="form-group">
-                    <label for="montoTransaccion">Monto (€)</label>
-                    <input type="number" id="montoTransaccion" step="0.01" required>
-                </div>
-                <div class="form-group">
-                    <label for="tipoTransaccion">Tipo</label>
-                    <select id="tipoTransaccion" required>
-                        <option value="gasto">Gasto</option>
-                        <option value="pago">Pago</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="dividirEquitativamente" checked>
-                        Dividir equitativamente entre todos
-                    </label>
-                </div>
-                <div id="participantesContainer" class="form-group" style="display: none;">
-                    <label>Seleccionar participantes</label>
-                    <div id="participantesList"></div>
-                </div>
+
                 <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close="modalNuevaTransaccion">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Crear Transacción</button>
+                    <button type="button" class="btn-secondary" data-close="modalAñadirMiembros">Cancelar</button>
+                    <button type="submit" class="btn-primary">Añadir Miembros</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Modal: Añadir Transacción en Grupo -->
+    <div id="modalTransaccionGrupo" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Añadir Gasto</h3>
+                <button class="btn-close" data-close="modalTransaccionGrupo">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formTransaccionGrupo">
+                <div class="form-group">
+                    <label for="conceptoTransaccionGrupo"><i class="fas fa-tag"></i> Concepto</label>
+                    <input type="text" id="conceptoTransaccionGrupo" required placeholder="Ej: Cena en restaurante">
+                </div>
+
+                <div class="form-group">
+                    <label for="montoTransaccionGrupo"><i class="fas fa-euro-sign"></i> Monto</label>
+                    <input type="number" id="montoTransaccionGrupo" step="0.01" required placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="fechaTransaccion"><i class="fas fa-calendar-alt"></i> Fecha (opcional)</label>
+                    <input type="datetime-local" id="fechaTransaccion">
+                </div>
+
+                <div class="form-group" id="containerPagador" style="display: none;">
+                    <label for="pagadorTransaccion"><i class="fas fa-wallet"></i> ¿Quién pagó?</label>
+                    <select id="pagadorTransaccion">
+                        <!-- Se carga dinámicamente -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-users"></i> ¿Quién debe pagar?</label>
+                    <div id="participantesTransaccion" class="checkbox-group">
+                        <!-- Se carga dinámicamente -->
+                    </div>
+                    <small><i class="fas fa-info-circle"></i> El monto se dividirá equitativamente entre los seleccionados</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-close="modalTransaccionGrupo">Cancelar</button>
+                    <button type="submit" class="btn-primary">Añadir Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Transacción -->
+    <div id="modalEditarTransaccion" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Gasto</h3>
+                <button class="btn-close" data-close="modalEditarTransaccion">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formEditarTransaccion">
+                <input type="hidden" id="editTransaccionId">
+                <input type="hidden" id="editTransaccionGrupoId">
+
+                <div class="form-group">
+                    <label for="editConceptoTransaccion"><i class="fas fa-tag"></i> Concepto</label>
+                    <input type="text" id="editConceptoTransaccion" required placeholder="Ej: Cena en restaurante">
+                </div>
+
+                <div class="form-group">
+                    <label for="editMontoTransaccion"><i class="fas fa-euro-sign"></i> Monto</label>
+                    <input type="number" id="editMontoTransaccion" step="0.01" required placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="editFechaTransaccion"><i class="fas fa-calendar-alt"></i> Fecha (opcional)</label>
+                    <input type="datetime-local" id="editFechaTransaccion">
+                </div>
+
+                <div class="form-group" id="editContainerPagador" style="display: none;">
+                    <label for="editPagadorTransaccion"><i class="fas fa-wallet"></i> ¿Quién pagó?</label>
+                    <select id="editPagadorTransaccion">
+                        <!-- Se carga dinámicamente -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-users"></i> ¿Quién debe pagar?</label>
+                    <div id="editParticipantesTransaccion" class="checkbox-group">
+                        <!-- Se carga dinámicamente -->
+                    </div>
+                    <small><i class="fas fa-info-circle"></i> El monto se dividirá equitativamente entre los seleccionados</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-close="modalEditarTransaccion">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Perfil -->
+    <div id="modalEditarPerfil" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Perfil</h3>
+                <button class="btn-close" data-close="modalEditarPerfil">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formEditarPerfil">
+                <div class="form-group">
+                    <label for="editNombre">Nombre</label>
+                    <input type="text" id="editNombre" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editNombreUsuario">Nombre de usuario</label>
+                    <input type="text" id="editNombreUsuario" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editEmail">Correo electrónico</label>
+                    <input type="email" id="editEmail" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editPassword">Nueva contraseña (dejar vacío para no cambiar)</label>
+                    <input type="password" id="editPassword" placeholder="••••••••">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-close="modalEditarPerfil">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
     <script src="js/auth.js" defer></script>
     <script src="js/grupos.js" defer></script>
     <script src="js/transacciones.js" defer></script>
     <script src="js/app.js" defer></script>
 </body>
-
 </html>
