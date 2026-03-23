@@ -4,10 +4,65 @@ import express from "express";
 import cors from "cors";
 import { poolBD } from "./bd.js";
 import "dotenv/config";
+import multer from "multer";
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join, extname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const uploadsDir = join(__dirname, "uploads");
+if (!existsSync(uploadsDir)) mkdirSync(uploadsDir);
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase() || ".jpg";
+        cb(null, `${req.params.id}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith("image/")) cb(null, true);
+        else cb(new Error("Solo se permiten imágenes"));
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+const storagePerfil = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const idUsuario = Number(req.params.id_usuario);
+        const ext = extname(file.originalname).toLowerCase() || ".jpg";
+        const prefix = `usuario-${idUsuario}`;
+
+        // Mantener solo una foto por usuario, aunque cambie la extensión.
+        for (const f of readdirSync(uploadsDir)) {
+            if (f.startsWith(prefix + ".")) {
+                unlinkSync(join(uploadsDir, f));
+            }
+        }
+
+        cb(null, `${prefix}${ext}`);
+    }
+});
+
+const uploadPerfil = multer({
+    storage: storagePerfil,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith("image/")) cb(null, true);
+        else cb(new Error("Solo se permiten imágenes"));
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(uploadsDir));
 
 const PUERTO = Number(process.env.PUERTO || 3000);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5500";
@@ -155,6 +210,22 @@ app.get("/api/usuarios/:id_usuario", ah(async (req, res) => {
     res.json(usuario);
 }));
 
+// Subir foto de perfil de usuario
+app.post("/api/usuarios/:id_usuario/foto", uploadPerfil.single("imagen"), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No se recibió ninguna imagen" });
+    res.json({ ok: true });
+});
+
+// Obtener foto de perfil de usuario
+app.get("/api/usuarios/:id_usuario/foto", (req, res) => {
+    const idUsuario = Number(req.params.id_usuario);
+    const prefix = `usuario-${idUsuario}`;
+    const files = readdirSync(uploadsDir);
+    const file = files.find(f => f.startsWith(prefix + "."));
+    if (!file) return res.status(404).json({ error: "No hay foto de perfil para este usuario" });
+    res.sendFile(join(uploadsDir, file));
+});
+
 // Obtener todos los usuarios (para select de miembros)
 app.get("/api/usuarios", ah(async (req, res) => {
     const [usuarios] = await poolBD.execute(
@@ -267,9 +338,12 @@ app.get("/api/grupos/:id_grupo", ah(async (req, res) => {
         });
     }
 
+    const uploadedIds = new Set(readdirSync(uploadsDir).map(f => f.split(".")[0]));
+
     const transaccionesConParticipantes = transacciones.map(t => ({
         ...t,
-        participantes: mapP.get(String(t.id_transaccion)) || []
+        participantes: mapP.get(String(t.id_transaccion)) || [],
+        tiene_imagen: uploadedIds.has(String(t.id_transaccion))
     }));
 
     res.json({ grupo, miembros, transacciones: transaccionesConParticipantes });
@@ -522,6 +596,21 @@ app.put("/api/transacciones/:id_transaccion", ah(async (req, res) => {
         res.status(500).json({ error: "Error al actualizar la transacción: " + error.message });
     }
 }));
+
+// Subir imagen de una transacción
+app.post("/api/transacciones/:id/imagen", upload.single("imagen"), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No se recibió ninguna imagen" });
+    res.json({ ok: true });
+});
+
+// Obtener imagen de una transacción
+app.get("/api/transacciones/:id/imagen", (req, res) => {
+    const id = req.params.id;
+    const files = readdirSync(uploadsDir);
+    const file = files.find(f => f.startsWith(id + "."));
+    if (!file) return res.status(404).json({ error: "No hay imagen para esta transacción" });
+    res.sendFile(join(uploadsDir, file));
+});
 
 /* =========================
    NOTIFICACIONES

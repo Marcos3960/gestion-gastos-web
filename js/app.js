@@ -56,7 +56,7 @@ function setupAuthListeners() {
       showScreen("appScreen");
       await loadApp();
     } catch (error) {
-      alert(error.message);
+      showPopup(error.message, "error");
     }
   });
 
@@ -74,7 +74,7 @@ function setupAuthListeners() {
       showScreen("appScreen");
       await loadApp();
     } catch (error) {
-      alert(error.message);
+      showPopup(error.message, "error");
     }
   });
 
@@ -132,6 +132,8 @@ function setupAppListeners() {
     document.getElementById("editNombreUsuario").value = user.nombreUsuario || "";
     document.getElementById("editEmail").value = user.email;
     document.getElementById("editPassword").value = "";
+    const inputFoto = document.getElementById("editFotoPerfil");
+    if (inputFoto) inputFoto.value = "";
   });
 
 
@@ -143,6 +145,8 @@ function setupAppListeners() {
     document.getElementById("editNombreUsuario").value = user.nombreUsuario || "";
     document.getElementById("editEmail").value = user.email;
     document.getElementById("editPassword").value = "";
+    const inputFoto = document.getElementById("editFotoPerfil");
+    if (inputFoto) inputFoto.value = "";
   });
 
 
@@ -155,9 +159,10 @@ function setupAppListeners() {
     const nombreUsuario = document.getElementById("editNombreUsuario").value.trim();
     const email = document.getElementById("editEmail").value.trim();
     const password = document.getElementById("editPassword").value.trim();
+    const fotoInput = document.getElementById("editFotoPerfil");
 
     if (!nombre || !nombreUsuario || !email) {
-      alert("Por favor completa los campos requeridos");
+      showPopup("Por favor completa los campos requeridos", "warning");
       return;
     }
 
@@ -170,17 +175,31 @@ function setupAppListeners() {
 
       await authManager.actualizarPerfil(nombre, nombreUsuario, email, password || null);
 
+      if (fotoInput?.files && fotoInput.files.length > 0) {
+        const currentUser = authManager.getCurrentUser();
+        const formData = new FormData();
+        formData.append("imagen", fotoInput.files[0]);
+        const respFoto = await fetch(`${API_URL}/usuarios/${encodeURIComponent(currentUser.id)}/foto`, {
+          method: "POST",
+          body: formData
+        });
+        if (!respFoto.ok) {
+          const err = await respFoto.json().catch(() => ({}));
+          throw new Error(err.error || "No se pudo subir la foto de perfil");
+        }
+      }
+
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;
 
-      alert("Perfil actualizado correctamente");
+      showPopup("Perfil actualizado correctamente", "success");
       closeModal("modalEditarPerfil");
       cargarAjustes();
     } catch (error) {
       const submitBtn = document.querySelector("#formEditarPerfil button[type='submit']");
       submitBtn.textContent = "Guardar cambios";
       submitBtn.disabled = false;
-      alert("Error: " + error.message);
+      showPopup("Error: " + error.message, "error");
     }
   });
 
@@ -341,7 +360,7 @@ function setupAppListeners() {
       e.target.reset();
       miembrosSeleccionadosGlobal = [];
     } catch (error) {
-      alert(error.message);
+      showPopup(error.message, "error");
     }
   });
 
@@ -391,7 +410,15 @@ function cargarAjustes() {
   const settingsUserName = document.getElementById("settingsUserName");
   const settingsUserEmail = document.getElementById("settingsUserEmail");
   const settingsUserUsername = document.getElementById("settingsUserUsername");
+  const profileCardAvatar = document.getElementById("profileCardAvatar");
   const profileCardInitials = document.getElementById("profileCardInitials");
+  const initials = usuario?.nombre
+    ? usuario.nombre
+      .split(" ")
+      .slice(0, 2)
+      .map(p => p[0].toUpperCase())
+      .join("")
+    : "?";
 
   if (settingsUserName) {
     settingsUserName.textContent = usuario?.nombre || "-";
@@ -402,12 +429,26 @@ function cargarAjustes() {
   if (settingsUserEmail) {
     settingsUserEmail.textContent = usuario?.email || "-";
   }
-  if (profileCardInitials && usuario?.nombre) {
-    profileCardInitials.textContent = usuario.nombre
-      .split(" ")
-      .slice(0, 2)
-      .map(p => p[0].toUpperCase())
-      .join("");
+  if (profileCardInitials) {
+    profileCardInitials.textContent = initials;
+  }
+  if (profileCardAvatar && usuario?.id) {
+    const fotoUrl = `${API_URL}/usuarios/${encodeURIComponent(usuario.id)}/foto?t=${Date.now()}`;
+    profileCardAvatar.style.backgroundImage = `url('${fotoUrl}')`;
+    profileCardAvatar.classList.add("has-photo");
+    if (profileCardInitials) profileCardInitials.style.display = "none";
+
+    const prueba = new Image();
+    prueba.onload = () => {
+      profileCardAvatar.classList.add("has-photo");
+      if (profileCardInitials) profileCardInitials.style.display = "none";
+    };
+    prueba.onerror = () => {
+      profileCardAvatar.classList.remove("has-photo");
+      profileCardAvatar.style.backgroundImage = "";
+      if (profileCardInitials) profileCardInitials.style.display = "";
+    };
+    prueba.src = fotoUrl;
   }
 }
 
@@ -499,10 +540,21 @@ async function verDetalleGrupo(grupoId) {
   const miembrosContainer = document.getElementById("detalleGrupoMiembros");
   miembrosContainer.innerHTML = grupo.miembros.map(m => `
     <div class="miembro-item">
-      <div>
-        <strong>${escapeHtml(m.nombre)}</strong>
-        ${m.rol === 'admin' ? '<span class="badge-admin">Admin</span>' : ''}
-        <br><small>@${escapeHtml(m.nombreUsuario || m.email)}</small>
+      <div class="miembro-main">
+        <div class="miembro-avatar" aria-hidden="true">
+          <span class="miembro-avatar-fallback">${escapeHtml(obtenerInicialesNombre(m.nombre))}</span>
+          <img
+            src="${API_URL}/usuarios/${encodeURIComponent(m.id)}/foto"
+            alt="Foto de ${escapeHtml(m.nombre)}"
+            loading="lazy"
+            onerror="this.remove()"
+          >
+        </div>
+        <div class="miembro-info">
+          <strong>${escapeHtml(m.nombre)}</strong>
+          ${m.rol === 'admin' ? '<span class="badge-admin">Admin</span>' : ''}
+          <br><small>@${escapeHtml(m.nombreUsuario || m.email)}</small>
+        </div>
       </div>
       ${(esAdmin && m.id !== grupo.adminId) ? `
         <button class="btn-icon-danger" onclick="eliminarMiembroGrupo('${grupoId}', '${m.id}')" title="Eliminar miembro">
@@ -515,17 +567,38 @@ async function verDetalleGrupo(grupoId) {
 
   // Balances
   const balances = gruposManager.calcularBalances(grupoId);
+  const transaccionesGasto = (grupo.transacciones || []).filter(t => t.tipo === "gasto");
+  const gastoTotalGrupo = transaccionesGasto.reduce((acc, t) => acc + Number(t.monto || 0), 0);
+  const gastoUsuario = transaccionesGasto.reduce((acc, t) => {
+    const parteUsuario = (t.participantes || []).find(
+      p => String(p.id_usuario) === String(currentUser.id)
+    );
+    return acc + Number(parteUsuario?.monto_debe || 0);
+  }, 0);
+
   const balancesContainer = document.getElementById("detalleGrupoBalances");
-  balancesContainer.innerHTML = Object.entries(balances).map(([userId, balance]) => {
-    const miembro = grupo.miembros.find(m => m.id === userId);
-    const balanceClass = balance > 0 ? "balance-positivo" : balance < 0 ? "balance-negativo" : "balance-neutro";
-    return `
-      <div class="balance-item ${balanceClass}">
-        <span>${escapeHtml(miembro?.nombre || "Usuario")}</span>
-        <span class="balance-monto">${balance.toFixed(2)} ${grupo.divisa}</span>
+  balancesContainer.innerHTML = `
+    <div class="balance-stats-row">
+      <div class="balance-stat-card">
+        <span class="balance-stat-label">Gasto total</span>
+        <span class="balance-stat-value">${gastoTotalGrupo.toFixed(2)} ${grupo.divisa}</span>
       </div>
-    `;
-  }).join("");
+      <div class="balance-stat-card">
+        <span class="balance-stat-label">Tu gasto</span>
+        <span class="balance-stat-value">${gastoUsuario.toFixed(2)} ${grupo.divisa}</span>
+      </div>
+    </div>
+    ${Object.entries(balances).map(([userId, balance]) => {
+      const miembro = grupo.miembros.find(m => m.id === userId);
+      const balanceClass = balance > 0 ? "balance-positivo" : balance < 0 ? "balance-negativo" : "balance-neutro";
+      return `
+        <div class="balance-item ${balanceClass}">
+          <span>${escapeHtml(miembro?.nombre || "Usuario")}</span>
+          <span class="balance-monto">${balance.toFixed(2)} ${grupo.divisa}</span>
+        </div>
+      `;
+    }).join("")}
+  `;
 
 
   // Transacciones
@@ -547,32 +620,43 @@ async function verDetalleGrupo(grupoId) {
         <div class="transaccion-content">
           <div class="transaccion-header-row">
             <div class="transaccion-info">
-              <strong>${escapeHtml(t.concepto)}</strong>
-              <small>Pagado por ${escapeHtml(t.pagadorNombre)} - ${formatearFecha(t.fecha)}</small>
+              <strong class="transaccion-concepto">${escapeHtml(t.concepto)}</strong>
+              <small class="transaccion-meta">Pagado por ${escapeHtml(t.pagadorNombre)} - ${formatearFecha(t.fecha)}</small>
             </div>
             <div class="transaccion-monto ${t.tipo}">
               ${t.monto.toFixed(2)} ${grupo.divisa}
-              ${esAdmin ? `
-                <button class="btn-icon-edit" onclick="abrirModalEditarTransaccion('${grupoId}', '${t.id}')" title="Editar gasto">
-                  <i class="fas fa-edit"></i>
-                </button>
-              ` : ''}
             </div>
           </div>
-          ${t.participantes && t.participantes.length > 0 ? `
-            <div class="participantes-list">
-              ${t.participantes.map(p => `
-                <span class="participante ${p.pagado ? 'pagado' : 'pendiente'}">
-                  ${escapeHtml(p.usuario_nombre)}: ${p.monto_debe.toFixed(2)} ${grupo.divisa}
-                  ${p.pagado ? '<i class="fas fa-check"></i>' : 
-                    (esAdmin || String(p.id_usuario) === currentUser.id ? 
-                      `<button class="btn-mark-paid" onclick="marcarComoPagado('${grupoId}', '${t.id}', '${p.id_usuario}')" title="Marcar como pagado">
-                        <i class="fas fa-check-circle"></i>
-                      </button>` : ''
-                    )
-                  }
-                </span>
-              `).join('')}
+          ${(t.participantes && t.participantes.length > 0) || t.tieneImagen || esAdmin ? `
+            <div class="transaccion-bottom">
+              ${t.participantes && t.participantes.length > 0 ? `
+                <div class="participantes-list">
+                  ${t.participantes.map(p => `
+                    <span class="participante ${p.pagado ? 'pagado' : 'pendiente'}">
+                      ${escapeHtml(p.usuario_nombre)}: ${p.monto_debe.toFixed(2)} ${grupo.divisa}
+                      ${p.pagado ? '<i class="fas fa-check"></i>' :
+                        (esAdmin || String(p.id_usuario) === currentUser.id ?
+                          `<button class="btn-mark-paid" onclick="marcarComoPagado('${grupoId}', '${t.id}', '${p.id_usuario}')" title="Marcar como pagado">
+                            <i class="fas fa-check-circle"></i>
+                          </button>` : ''
+                        )
+                      }
+                    </span>
+                  `).join('')}
+                </div>
+              ` : ''}
+              <div class="transaccion-actions">
+                ${t.tieneImagen ? `
+                  <button class="btn-ver-imagen" onclick="verImagenTransaccion('${t.id}')" title="Ver imagen del ticket">
+                    <i class="fas fa-image"></i> Ver imagen
+                  </button>
+                ` : ''}
+                ${esAdmin ? `
+                  <button class="btn-icon-edit btn-edit-bottom" onclick="abrirModalEditarTransaccion('${grupoId}', '${t.id}')" title="Editar gasto">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                ` : ''}
+              </div>
             </div>
           ` : ''}
         </div>
@@ -585,13 +669,20 @@ async function verDetalleGrupo(grupoId) {
 }
 
 
+function verImagenTransaccion(transaccionId) {
+  const img = document.getElementById("imagenTransaccionViewer");
+  img.src = `${API_URL}/transacciones/${transaccionId}/imagen`;
+  openModal("modalVerImagen");
+}
+
+
 async function abrirModalTransaccionGrupo(grupoId) {
   // Asegurar que el detalle del grupo esté cargado
   await gruposManager.cargarDetalleGrupo(grupoId);
   const grupo = gruposManager.obtenerGrupo(grupoId);
 
   if (!grupo) {
-    alert('No se pudo cargar la información del grupo');
+    showPopup('No se pudo cargar la información del grupo', "error");
     return;
   }
 
@@ -646,7 +737,7 @@ async function abrirModalTransaccionGrupo(grupoId) {
     const participantesSeleccionados = Array.from(containerParticipantes.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
 
     if (participantesSeleccionados.length === 0) {
-      alert('Debes seleccionar al menos un participante');
+      showPopup('Debes seleccionar al menos un participante', "warning");
       return;
     }
 
@@ -660,7 +751,7 @@ async function abrirModalTransaccionGrupo(grupoId) {
 
 
     try {
-      await transaccionesManager.crearTransaccion(
+      const resultado = await transaccionesManager.crearTransaccion(
         grupoId,
         concepto,
         monto,
@@ -669,11 +760,22 @@ async function abrirModalTransaccionGrupo(grupoId) {
         pagadorId,
         fecha || null
       );
+
+      const imagenInput = document.getElementById("imagenTransaccion");
+      if (imagenInput.files && imagenInput.files.length > 0) {
+        const formData = new FormData();
+        formData.append("imagen", imagenInput.files[0]);
+        await fetch(`${API_URL}/transacciones/${resultado.id_transaccion}/imagen`, {
+          method: "POST",
+          body: formData
+        });
+      }
+
       closeModal("modalTransaccionGrupo");
       await verDetalleGrupo(grupoId);
       form.reset();
     } catch (error) {
-      alert(error.message);
+      showPopup(error.message, "error");
     }
   };
 }
@@ -684,7 +786,7 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
   const grupo = gruposManager.obtenerGrupo(grupoId);
 
   if (!grupo) {
-    alert('No se pudo cargar la información del grupo');
+    showPopup('No se pudo cargar la información del grupo', "error");
     return;
   }
 
@@ -692,7 +794,7 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
   const transaccion = grupo.transacciones.find(t => t.id === String(transaccionId));
   
   if (!transaccion) {
-    alert('No se pudo encontrar la transacción');
+    showPopup('No se pudo encontrar la transacción', "error");
     return;
   }
 
@@ -773,7 +875,7 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
     ).map(cb => cb.value);
 
     if (participantesSeleccionados.length === 0) {
-      alert('Debes seleccionar al menos un participante');
+      showPopup('Debes seleccionar al menos un participante', "warning");
       return;
     }
 
@@ -796,9 +898,9 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
       );
       closeModal("modalEditarTransaccion");
       await verDetalleGrupo(grupoIdActual);
-      alert('Gasto actualizado correctamente');
+      showPopup('Gasto actualizado correctamente', "success");
     } catch (error) {
-      alert('Error al actualizar: ' + error.message);
+      showPopup('Error al actualizar: ' + error.message, "error");
     }
   };
 }
@@ -916,7 +1018,7 @@ document.getElementById("formAñadirMiembros").addEventListener("submit", async 
   e.preventDefault();
   
   if (miembrosSeleccionadosGrupoGlobal.length === 0) {
-    alert("Debes seleccionar al menos un miembro");
+    showPopup("Debes seleccionar al menos un miembro", "warning");
     return;
   }
 
@@ -931,72 +1033,72 @@ document.getElementById("formAñadirMiembros").addEventListener("submit", async 
     closeModal("modalAñadirMiembros");
     await verDetalleGrupo(grupoIdActualAñadirMiembros);
     miembrosSeleccionadosGrupoGlobal = [];
-    alert("Miembros añadidos correctamente");
+    showPopup("Miembros añadidos correctamente", "success");
   } catch (error) {
-    alert("Error al añadir miembros: " + error.message);
+    showPopup("Error al añadir miembros: " + error.message, "error");
   }
 });
 
 async function marcarComoPagado(grupoId, transaccionId, usuarioId) {
-  if (!confirm("¿Confirmar que este pago ha sido realizado?")) {
+  if (!await showConfirmPopup("¿Confirmar que este pago ha sido realizado?", "Confirmar pago", "primary")) {
     return;
   }
 
   try {
     await transaccionesManager.marcarComoPagada(grupoId, transaccionId, usuarioId);
     await verDetalleGrupo(grupoId);
-    alert("Pago marcado como realizado");
+    showPopup("Pago marcado como realizado", "success");
   } catch (error) {
-    alert("Error al marcar como pagado: " + error.message);
+    showPopup("Error al marcar como pagado: " + error.message, "error");
   }
 }
 
 async function eliminarGrupo(grupoId) {
-  if (!confirm("¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer.")) {
+  if (!await showConfirmPopup("¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer.", "Eliminar grupo", "danger")) {
     return;
   }
 
   const currentUser = authManager.getCurrentUser();
   try {
     await gruposManager.eliminarGrupo(grupoId, currentUser.id);
-    alert("Grupo eliminado correctamente");
+    showPopup("Grupo eliminado correctamente", "success");
     switchView("grupos");
     await loadGrupos();
   } catch (error) {
-    alert(error.message);
+    showPopup(error.message, "error");
   }
 }
 
 
 async function salirDelGrupo(grupoId) {
-  if (!confirm("¿Estás seguro de que quieres salir de este grupo?")) {
+  if (!await showConfirmPopup("¿Estás seguro de que quieres salir de este grupo?", "Salir del grupo", "primary")) {
     return;
   }
 
   const currentUser = authManager.getCurrentUser();
   try {
     await gruposManager.eliminarMiembro(grupoId, currentUser.id, currentUser.id);
-    alert("Has salido del grupo correctamente");
+    showPopup("Has salido del grupo correctamente", "success");
     switchView("grupos");
     await loadGrupos();
   } catch (error) {
-    alert(error.message);
+    showPopup(error.message, "error");
   }
 }
 
 
 async function eliminarMiembroGrupo(grupoId, miembroId) {
-  if (!confirm("¿Estás seguro de que quieres eliminar a este miembro del grupo?")) {
+  if (!await showConfirmPopup("¿Estás seguro de que quieres eliminar a este miembro del grupo?", "Eliminar miembro", "danger")) {
     return;
   }
 
   const currentUser = authManager.getCurrentUser();
   try {
     await gruposManager.eliminarMiembro(grupoId, miembroId, currentUser.id);
-    alert("Miembro eliminado correctamente");
+    showPopup("Miembro eliminado correctamente", "success");
     await verDetalleGrupo(grupoId);
   } catch (error) {
-    alert(error.message);
+    showPopup(error.message, "error");
   }
 }
 
@@ -1116,10 +1218,114 @@ function closeModal(modalId) {
 }
 
 
+function getPopupContainer() {
+  let container = document.getElementById("appPopupContainer");
+  if (container) return container;
+
+  container = document.createElement("div");
+  container.id = "appPopupContainer";
+  container.className = "popup-container";
+  container.setAttribute("aria-live", "polite");
+  container.setAttribute("aria-atomic", "false");
+  document.body.appendChild(container);
+  return container;
+}
+
+
+function showPopup(message, type = "info", duration = 3200) {
+  const container = getPopupContainer();
+  const popup = document.createElement("div");
+  popup.className = `app-popup ${type}`;
+
+  const text = document.createElement("span");
+  text.className = "app-popup-message";
+  text.textContent = String(message || "");
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "app-popup-close";
+  closeBtn.type = "button";
+  closeBtn.setAttribute("aria-label", "Cerrar notificación");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", () => removePopup(popup));
+
+  popup.appendChild(text);
+  popup.appendChild(closeBtn);
+  container.appendChild(popup);
+
+  requestAnimationFrame(() => popup.classList.add("show"));
+
+  if (duration > 0) {
+    setTimeout(() => removePopup(popup), duration);
+  }
+}
+
+
+function removePopup(popup) {
+  if (!popup || !popup.parentElement) return;
+  popup.classList.remove("show");
+  setTimeout(() => {
+    if (popup.parentElement) {
+      popup.parentElement.removeChild(popup);
+    }
+  }, 220);
+}
+
+
+function showConfirmPopup(message, confirmLabel = "Confirmar", tone = "primary") {
+  return new Promise((resolve) => {
+    const container = getPopupContainer();
+    const popup = document.createElement("div");
+    popup.className = "app-popup confirm show";
+
+    const body = document.createElement("div");
+    body.className = "app-popup-message";
+    body.textContent = String(message || "");
+
+    const actions = document.createElement("div");
+    actions.className = "app-popup-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "app-popup-btn cancel";
+    cancelBtn.textContent = "Cancelar";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = `app-popup-btn ${tone === "danger" ? "danger" : "primary"}`;
+    confirmBtn.textContent = confirmLabel;
+
+    const close = (result) => {
+      removePopup(popup);
+      resolve(result);
+    };
+
+    cancelBtn.addEventListener("click", () => close(false));
+    confirmBtn.addEventListener("click", () => close(true));
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    popup.appendChild(body);
+    popup.appendChild(actions);
+    container.appendChild(popup);
+  });
+}
+
+
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+
+function obtenerInicialesNombre(nombre) {
+  if (!nombre) return "?";
+  return String(nombre)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(parte => (parte[0] || "").toUpperCase())
+    .join("") || "?";
 }
 
 
@@ -1208,7 +1414,6 @@ async function loadEstadisticas() {
           <div class="transaction-info">
             <div class="transaction-header">
               <h4>${escapeHtml(t.concepto)}</h4>
-              <span class="transaction-amount ${tipoClass}">${esPagador ? '+' : '-'}${Number(t.monto).toFixed(2)}€</span>
             </div>
             <div class="transaction-details">
               <span class="transaction-group"><i class="fas fa-users"></i> ${escapeHtml(t.grupoNombre)}</span>
@@ -1217,6 +1422,7 @@ async function loadEstadisticas() {
             </div>
             ${!esPagador ? `<div class="transaction-payer">Pagador: ${escapeHtml(t.pagadorNombre)}</div>` : ''}
           </div>
+          <span class="transaction-amount ${tipoClass}">${esPagador ? '+' : '-'}${Number(t.monto).toFixed(2)}€</span>
           <div class="transaction-status">
             <span class="badge ${t.estado === 'completada' ? 'success' : 'warning'}">
               ${t.estado === 'completada' ? 'Completada' : 'Pendiente'}
@@ -1236,6 +1442,8 @@ async function loadEstadisticas() {
       
       const balances = gruposManager.calcularBalances(grupo.id);
       const miBalance = balances[currentUser.id] || 0;
+      let restantePorCobrar = miBalance > 0 ? miBalance : 0;
+      let restantePorPagar = miBalance < 0 ? Math.abs(miBalance) : 0;
       
       // Si tengo balance positivo, otros me deben
       // Si tengo balance negativo, yo debo a otros
@@ -1246,24 +1454,26 @@ async function loadEstadisticas() {
         const balanceMiembro = balances[miembro.id] || 0;
         
         // Si yo tengo balance positivo y el otro negativo, me debe
-        if (miBalance > 0 && balanceMiembro < 0) {
-          const deuda = Math.min(miBalance, Math.abs(balanceMiembro));
+        if (restantePorCobrar > 0 && balanceMiembro < 0) {
+          const deuda = Math.min(restantePorCobrar, Math.abs(balanceMiembro));
           if (deuda > 0.01) {
             if (!deudores[miembro.id]) {
               deudores[miembro.id] = { nombre: miembro.nombre, monto: 0 };
             }
             deudores[miembro.id].monto += deuda;
+            restantePorCobrar -= deuda;
           }
         }
         
         // Si yo tengo balance negativo y el otro positivo, le debo
-        if (miBalance < 0 && balanceMiembro > 0) {
-          const deuda = Math.min(Math.abs(miBalance), balanceMiembro);
+        if (restantePorPagar > 0 && balanceMiembro > 0) {
+          const deuda = Math.min(restantePorPagar, balanceMiembro);
           if (deuda > 0.01) {
             if (!acreedores[miembro.id]) {
               acreedores[miembro.id] = { nombre: miembro.nombre, monto: 0 };
             }
             acreedores[miembro.id].monto += deuda;
+            restantePorPagar -= deuda;
           }
         }
       });

@@ -90,7 +90,8 @@ class GruposManager {
                 pagadorNombre: t.nombre_pagador,
                 receptorId: t.id_receptor ? String(t.id_receptor) : null,
                 fecha: t.fecha_transaccion || t.fecha_creacion,
-                participantes: t.participantes || []
+                participantes: t.participantes || [],
+                tieneImagen: !!t.tiene_imagen
             }))
         };
     }
@@ -104,13 +105,14 @@ class GruposManager {
 
         grupo.transacciones.forEach(t => {
             if (t.tipo === "gasto") {
-                // El pagador adelantó el dinero
-                balances[t.pagadorId] = (balances[t.pagadorId] || 0) + t.monto;
-
-                // Cada participante debe su parte
+                // El pagador tiene como saldo a favor solo lo que sigue pendiente de cobro.
                 if (t.participantes && t.participantes.length > 0) {
                     t.participantes.forEach(p => {
-                        balances[String(p.id_usuario)] = (balances[String(p.id_usuario)] || 0) - p.monto_debe;
+                        if (!p.pagado) {
+                            const debe = Number(p.monto_debe || 0);
+                            balances[String(p.id_usuario)] = (balances[String(p.id_usuario)] || 0) - debe;
+                            balances[t.pagadorId] = (balances[t.pagadorId] || 0) + debe;
+                        }
                     });
                 }
             } else if (t.tipo === "pago" && t.estado === "completada" && t.receptorId) {
