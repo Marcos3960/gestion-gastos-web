@@ -31,6 +31,284 @@
 }
 
 /* ---------------------------------------------------------
+   1b. LIGHT MODE TOKENS
+   --------------------------------------------------------- */
+[data-theme="light"] {
+  --surface: #f9f9f9;
+  --surface-dim: #f0f0f0;
+  --surface-bright: #ffffff;
+  --surface-low: #f2f2f2;
+  --surface-container: #ffffff;
+  --surface-high: #ebebeb;
+  --surface-highest: #e2e2e2;
+  --on-surface: #111111;
+  --on-surface-variant: #444444;
+  --outline: #888888;
+  --outline-variant: #d0d0d0;
+  --primary: #1a44cc;
+  --primary-container: #1a44cc;
+  --on-primary: #ffffff;
+  --on-primary-container: #ffffff;
+  --secondary: #008a5e;
+  --secondary-container: #d4f5e9;
+  --on-secondary-container: #003d28;
+  --error: #cc1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #410002;
+  --ghost-border: rgba(0, 0, 0, 0.1);
+}
+
+/* Overrides para elementos con colores hardcodeados en modo claro */
+[data-theme="light"] body {
+  color: var(--on-surface);
+}
+
+/* Auth panel decorativo */
+[data-theme="light"] .auth-panel {
+  background: linear-gradient(145deg, #e8e8e8 0%, #d8d8d8 60%, #cccccc 100%);
+}
+
+[data-theme="light"] .auth-panel::before {
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.06) 0%, transparent 70%);
+}
+
+[data-theme="light"] .auth-panel::after {
+  background: radial-gradient(circle, rgba(0, 138, 94, 0.08) 0%, transparent 70%);
+}
+
+[data-theme="light"] .auth-brand-icon,
+[data-theme="light"] .auth-brand-name {
+  color: #1a44cc;
+}
+
+[data-theme="light"] .auth-panel-title {
+  color: #111111;
+}
+
+[data-theme="light"] .auth-panel-sub,
+[data-theme="light"] .auth-feature {
+  color: #444444;
+}
+
+[data-theme="light"] .auth-feature i {
+  background: rgba(255,255,255,0.8);
+  color: #1a44cc;
+}
+
+/* Sombras */
+[data-theme="light"] .modal-content {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .app-header {
+  box-shadow: 0 1px 0 var(--ghost-border);
+}
+
+/* Log timeline (colores de texto hardcodeados) */
+[data-theme="light"] .log-entry-desc {
+  color: var(--on-surface-variant);
+}
+
+[data-theme="light"] .log-entry-desc strong {
+  color: var(--on-surface);
+}
+
+[data-theme="light"] .log-entry-time {
+  color: var(--outline);
+}
+
+/* Popup notificaciones */
+[data-theme="light"] .popup-notification {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: var(--surface-container);
+}
+
+/* Badges de estado */
+[data-theme="light"] .st-tx-badge.pagada {
+  background: rgba(0, 138, 94, 0.12);
+  color: #007a50;
+  border-color: rgba(0, 138, 94, 0.3);
+}
+
+[data-theme="light"] .st-tx-badge.pendiente {
+  background: rgba(180, 100, 0, 0.1);
+  color: #9a5500;
+  border-color: rgba(180, 100, 0, 0.25);
+}
+
+/* Tarjetas de grupo */
+[data-theme="light"] .grupo-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .grupo-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Balances */
+[data-theme="light"] .balance-positivo {
+  color: #007a50;
+}
+
+[data-theme="light"] .balance-negativo {
+  color: #ba1a1a;
+}
+
+/* Notificaciones panel */
+[data-theme="light"] .notif-panel {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Sidebar */
+[data-theme="light"] .app-sidebar {
+  box-shadow: 1px 0 0 var(--ghost-border);
+}
+
+/* Focus ring inputs */
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(26, 68, 204, 0.15);
+  border-color: var(--primary);
+}
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: var(--surface-low);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+}
+
+/* Chart tooltip */
+[data-theme="light"] .chartjs-tooltip {
+  background: var(--surface-container) !important;
+  color: var(--on-surface) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
+}
+
+/* Texto negro global en modo claro — todos los elementos de texto usan negro salvo excepciones */
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] h4,
+[data-theme="light"] p,
+[data-theme="light"] span:not(.balance-positivo):not(.balance-negativo):not(.st-contact-amount):not(.st-net):not(.pos-text):not(.neg-text):not(.grupo-card-badge):not(.notif-inv-btn):not(.participante-row-monto),
+[data-theme="light"] label,
+[data-theme="light"] a,
+[data-theme="light"] li,
+[data-theme="light"] td,
+[data-theme="light"] th,
+[data-theme="light"] small,
+[data-theme="light"] button:not(.btn-primary):not(.btn-auth):not(.notif-inv-btn):not(.btn-danger):not(.sidebar-logout-btn):not(.confirmLogoutAccept) {
+  color: var(--on-surface);
+}
+
+[data-theme="light"] .on-surface-variant,
+[data-theme="light"] .subtitle,
+[data-theme="light"] small,
+[data-theme="light"] .modal-gasto-subtitle,
+[data-theme="light"] .modal-gasto-hint,
+[data-theme="light"] .grupo-card-desc,
+[data-theme="light"] .grupo-card-meta-label,
+[data-theme="light"] .auth-panel-sub,
+[data-theme="light"] .aj-sidebar-label,
+[data-theme="light"] .st-label,
+[data-theme="light"] .st-contact-sub,
+[data-theme="light"] .participante-row-sub,
+[data-theme="light"] .balance-row-status.balance-neutro,
+[data-theme="light"] .notif-body small,
+[data-theme="light"] .log-entry-time {
+  color: #555555;
+}
+
+/* Links */
+[data-theme="light"] a {
+  color: #1a44cc;
+}
+
+/* Input placeholder */
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #999999;
+}
+
+/* Nav items inactivos */
+[data-theme="light"] .nav-item:not(.active),
+[data-theme="light"] .sidebar-nav .nav-item:not(.active) {
+  color: #444444;
+}
+
+/* Nav item activo (fondo azul → texto blanco siempre) */
+[data-theme="light"] .sidebar-nav .nav-item.active,
+[data-theme="light"] .sidebar-nav .nav-item.active span,
+[data-theme="light"] .sidebar-nav .nav-item.active i {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .app-nav .nav-item.active,
+[data-theme="light"] .app-nav .nav-item.active span,
+[data-theme="light"] .app-nav .nav-item.active i {
+  color: var(--primary) !important;
+}
+
+/* Avatares con iniciales — texto blanco sobre fondo de color */
+[data-theme="light"] .miembro-avatar,
+[data-theme="light"] .miembro-avatar span,
+[data-theme="light"] .participante-row-avatar,
+[data-theme="light"] .participante-row-avatar span,
+[data-theme="light"] .st-tx-group-icon,
+[data-theme="light"] .modal-gasto-icon {
+  color: #ffffff !important;
+}
+
+/* Avatares de contacto: fondo con color visible en modo claro */
+[data-theme="light"] .st-contact-avatar {
+  background: var(--primary-container);
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .st-contact-avatar span {
+  color: #ffffff !important;
+}
+
+/* Icono de grupo en tarjeta */
+[data-theme="light"] .grupo-card-icon {
+  background: rgba(26, 68, 204, 0.1);
+  color: #1a44cc !important;
+}
+
+/* Botón logout sidebar: mantener rojo */
+[data-theme="light"] .sidebar-logout-btn,
+[data-theme="light"] .sidebar-logout-btn span,
+[data-theme="light"] .sidebar-logout-btn i {
+  color: var(--error) !important;
+}
+
+/* Botones con fondo de color → texto blanco siempre */
+[data-theme="light"] .btn-primary,
+[data-theme="light"] .btn-primary span,
+[data-theme="light"] .btn-primary i,
+[data-theme="light"] .btn-auth,
+[data-theme="light"] .btn-auth span {
+  color: #ffffff !important;
+}
+
+/* Iconos de header */
+[data-theme="light"] .header-icon-btn {
+  color: #333333;
+}
+
+/* Log timeline */
+[data-theme="light"] .log-entry-desc {
+  color: #333333;
+}
+[data-theme="light"] .log-entry-desc strong {
+  color: #111111;
+}
+
+/* ---------------------------------------------------------
    2. RESET & BASE
    --------------------------------------------------------- */
 *, *::before, *::after {
@@ -1275,10 +1553,37 @@ textarea {
   background: var(--surface-high);
 }
 
+.miembro-info-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
 .miembro-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+}
+
+.badge-admin {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+[data-theme="light"] .badge-admin {
+  background: rgba(180, 120, 0, 0.1);
+  border-color: rgba(180, 120, 0, 0.3);
+  color: #9a6200;
 }
 
 .miembro-avatar {
@@ -3510,12 +3815,12 @@ textarea {
    --------------------------------------------------------- */
 .popup-container {
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  top: calc(56px + 0.75rem);
+  right: 1.25rem;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
   pointer-events: none;
 }
 
@@ -3523,16 +3828,16 @@ textarea {
   background: var(--surface-container);
   border: 1px solid var(--ghost-border);
   border-radius: 12px;
-  padding: 0.875rem 1rem;
-  min-width: 280px;
-  max-width: 360px;
+  padding: 0.75rem 1rem;
+  min-width: 260px;
+  max-width: 340px;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   pointer-events: all;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(-6px);
   transition: opacity 0.2s, transform 0.2s;
 }
 

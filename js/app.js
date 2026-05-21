@@ -25,7 +25,7 @@ function initApp() {
    TEMA OSCURO
 ========================= */
 function loadTheme() {
-  const theme = localStorage.getItem("theme") || "light";
+  const theme = localStorage.getItem("theme") || "dark";
   document.documentElement.setAttribute("data-theme", theme);
   const toggle = document.getElementById("themeToggle");
   if (toggle) {
@@ -707,10 +707,12 @@ async function verDetalleGrupo(grupoId) {
             onerror="this.remove()"
           >
         </div>
-        <div class="miembro-info">
-          <strong>${escapeHtml(m.nombre)}</strong>
-          ${m.rol === 'admin' ? '<span class="badge-admin">Admin</span>' : ''}
-          <br><small>@${escapeHtml(m.nombreUsuario || m.email)}</small>
+        <div class="miembro-info-wrap">
+          <div class="miembro-info">
+            <strong>${escapeHtml(m.nombre)}</strong>
+            ${m.rol === 'admin' ? '<span class="badge-admin">Admin</span>' : ''}
+          </div>
+          <small>@${escapeHtml(m.nombreUsuario || m.email)}</small>
         </div>
       </div>
       ${(esAdmin && m.id !== grupo.adminId) ? `
@@ -753,7 +755,7 @@ async function verDetalleGrupo(grupoId) {
       <span class="balance-total-value">${gastoTotalGrupo.toFixed(2)} ${grupo.divisa}</span>
     </div>
     <div class="balance-rows">
-      ${Object.entries(balances).map(([userId, balance]) => {
+      ${Object.entries(balances).sort((a, b) => b[1] - a[1]).map(([userId, balance]) => {
         const nombre = nombresPorId[String(userId)] || "Usuario eliminado";
         const colorClass = balance > 0 ? "balance-positivo" : balance < 0 ? "balance-negativo" : "balance-neutro";
         const statusText = balance > 0 ? "A favor" : balance < 0 ? "Debe" : "Al día";
