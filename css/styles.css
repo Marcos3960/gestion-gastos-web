@@ -1586,6 +1586,21 @@ textarea {
   color: #9a6200;
 }
 
+.badge-offline {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(139, 139, 139, 0.15);
+  border: 1px solid rgba(139, 139, 139, 0.3);
+  color: var(--on-surface-variant);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
 .miembro-avatar {
   width: 34px;
   height: 34px;
@@ -3234,6 +3249,106 @@ textarea {
 .modal-gasto form {
   padding: 0;
   gap: 0;
+}
+
+/* Selección de tipo de grupo */
+.group-type-body {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.group-type-hint {
+  font-size: 0.85rem;
+  color: var(--on-surface-variant);
+  margin-bottom: 1rem;
+}
+
+.group-type-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.group-type-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.125rem;
+  background: var(--surface-high);
+  border: 1.5px solid var(--ghost-border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.group-type-card:hover {
+  border-color: var(--primary);
+  background: var(--surface-highest);
+}
+
+.group-type-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(183, 196, 255, 0.12);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.group-type-icon.offline {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+[data-theme="light"] .group-type-icon.offline {
+  color: #9a6200;
+  background: rgba(180, 120, 0, 0.1);
+}
+
+.group-type-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.group-type-info strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.group-type-info span {
+  font-size: 0.78rem;
+  color: var(--on-surface-variant);
+  line-height: 1.4;
+}
+
+.group-type-arrow {
+  color: var(--on-surface-variant);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+/* Input de miembro offline */
+.offline-member-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.offline-member-input input {
+  flex: 1;
+}
+
+.offline-member-input .btn-primary {
+  padding: 0 0.875rem;
+  flex-shrink: 0;
 }
 
 .modal-actions {

@@ -646,25 +646,50 @@
     <div id="modalCrearGrupo" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 data-i18n="modal_create_group_title">Crear Nuevo Grupo</h3>
+                <h3 id="modalCrearGrupoTitle">Crear Nuevo Grupo</h3>
                 <button class="btn-close" data-close="modalCrearGrupo">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <form id="formCrearGrupo">
+            <!-- Paso 1: Selección de tipo -->
+            <div id="stepTipoGrupo">
+                <div class="group-type-body">
+                    <p class="group-type-hint">Elige cómo quieres que funcione este grupo</p>
+                    <div class="group-type-grid">
+                        <button type="button" class="group-type-card" data-tipo="clasico">
+                            <div class="group-type-icon"><i class="fas fa-users"></i></div>
+                            <div class="group-type-info">
+                                <strong>Clásico</strong>
+                                <span>Los miembros son usuarios registrados en Apaxas. Pueden ver el grupo y confirmar pagos desde su cuenta.</span>
+                            </div>
+                            <i class="fas fa-chevron-right group-type-arrow"></i>
+                        </button>
+                        <button type="button" class="group-type-card" data-tipo="offline">
+                            <div class="group-type-icon offline"><i class="fas fa-user-slash"></i></div>
+                            <div class="group-type-info">
+                                <strong>Offline</strong>
+                                <span>Los participantes se añaden solo por nombre, sin necesitar cuenta. Ideal para grupos con personas que no usan la app.</span>
+                            </div>
+                            <i class="fas fa-chevron-right group-type-arrow"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paso 2: Formulario del grupo -->
+            <form id="formCrearGrupo" style="display:none">
+                <input type="hidden" id="tipoGrupoInput" value="clasico">
                 <div class="form-group">
-                    <label for="nombreGrupo" data-i18n="modal_group_name_label">Nombre del grupo</label>
+                    <label for="nombreGrupo">Nombre del grupo</label>
                     <input type="text" id="nombreGrupo" required>
                 </div>
-
                 <div class="form-group">
-                    <label for="descripcionGrupo" data-i18n="modal_group_desc_label">Descripción (opcional)</label>
-                    <textarea id="descripcionGrupo" rows="3"></textarea>
+                    <label for="descripcionGrupo">Descripción (opcional)</label>
+                    <textarea id="descripcionGrupo" rows="2"></textarea>
                 </div>
-
                 <div class="form-group">
-                    <label for="divisaGrupo" data-i18n="modal_group_currency_label">Divisa</label>
+                    <label for="divisaGrupo">Divisa</label>
                     <select id="divisaGrupo" required>
                         <option value="EUR">EUR (€)</option>
                         <option value="USD">USD ($)</option>
@@ -677,18 +702,27 @@
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label for="buscarUsuario" data-i18n="modal_group_members_label">Añadir miembros</label>
-                    <input type="text" id="buscarUsuario" data-i18n-ph="modal_group_members_placeholder" placeholder="Buscar por nombre o correo...">
+                <!-- Miembros clásico (búsqueda de usuarios) -->
+                <div class="form-group" id="seccionMiembrosClasico">
+                    <label for="buscarUsuario">Añadir miembros</label>
+                    <input type="text" id="buscarUsuario" placeholder="Buscar por nombre o usuario...">
                     <div id="resultadosBusqueda" class="search-results"></div>
-                    <div id="miembrosSeleccionados" class="selected-members">
-                        <!-- Miembros seleccionados aparecerán aquí -->
+                    <div id="miembrosSeleccionados" class="selected-members"></div>
+                </div>
+
+                <!-- Miembros offline (input de nombre libre) -->
+                <div class="form-group" id="seccionMiembrosOffline" style="display:none">
+                    <label>Añadir participantes</label>
+                    <div class="offline-member-input">
+                        <input type="text" id="nombreMiembroOffline" placeholder="Nombre del participante">
+                        <button type="button" id="btnAddOfflineMember" class="btn-primary"><i class="fas fa-plus"></i></button>
                     </div>
+                    <div id="miembrosOfflineList" class="selected-members"></div>
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" data-close="modalCrearGrupo" data-i18n="modal_btn_cancel">Cancelar</button>
-                    <button type="submit" class="btn-primary" data-i18n="modal_btn_create_group">Crear Grupo</button>
+                    <button type="button" class="btn-secondary" id="btnVolverTipoGrupo">← Volver</button>
+                    <button type="submit" class="btn-primary">Crear Grupo</button>
                 </div>
             </form>
         </div>
@@ -700,8 +734,8 @@
             <div class="modal-gasto-header">
                 <div class="modal-gasto-icon"><i class="fas fa-user-plus"></i></div>
                 <div>
-                    <h3 data-i18n="modal_add_members_title">Añadir Miembros</h3>
-                    <p class="modal-gasto-subtitle" data-i18n="modal_add_members_subtitle">Busca y selecciona usuarios para añadir</p>
+                    <h3 id="modalAddMiembrosTitle">Añadir Miembros</h3>
+                    <p class="modal-gasto-subtitle" id="modalAddMiembrosSubtitle">Busca y selecciona usuarios para añadir</p>
                 </div>
                 <button class="btn-close" data-close="modalAddMiembros">
                     <i class="fas fa-times"></i>
@@ -710,21 +744,35 @@
 
             <form id="formAddMiembros">
                 <div class="modal-gasto-body">
-                    <div class="form-group">
-                        <label for="buscarUsuarioGrupo" data-i18n="modal_add_members_search_label">Buscar usuario</label>
-                        <input type="text" id="buscarUsuarioGrupo" data-i18n-ph="modal_add_members_search_placeholder" placeholder="Buscar por nombre o usuario...">
-                        <div id="resultadosBusquedaGrupo" class="search-results"></div>
+                    <!-- Sección clásico: búsqueda de usuarios -->
+                    <div id="addMiembrosSeccionClasico">
+                        <div class="form-group">
+                            <label for="buscarUsuarioGrupo">Buscar usuario</label>
+                            <input type="text" id="buscarUsuarioGrupo" placeholder="Buscar por nombre o usuario...">
+                            <div id="resultadosBusquedaGrupo" class="search-results"></div>
+                        </div>
+                        <div id="miembrosSeleccionadosGrupo" class="selected-members"></div>
                     </div>
-                    <div id="miembrosSeleccionadosGrupo" class="selected-members"></div>
+                    <!-- Sección offline: nombre libre -->
+                    <div id="addMiembrosSeccionOffline" style="display:none">
+                        <div class="form-group">
+                            <label>Nombre del participante</label>
+                            <div class="offline-member-input">
+                                <input type="text" id="nombreMiembroOfflineGrupo" placeholder="Nombre del participante">
+                                <button type="button" id="btnAddOfflineMemberGrupo" class="btn-primary"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        <div id="miembrosOfflineGrupoList" class="selected-members"></div>
+                    </div>
                 </div>
             </form>
 
             <div class="modal-gasto-footer">
                 <button type="button" class="btn-secondary" data-close="modalAddMiembros">
-                    <i class="fas fa-times"></i> <span data-i18n="modal_btn_cancel">Cancelar</span>
+                    <i class="fas fa-times"></i> <span>Cancelar</span>
                 </button>
                 <button type="button" class="btn-primary" onclick="document.getElementById('formAddMiembros').requestSubmit()">
-                    <i class="fas fa-user-plus"></i> <span data-i18n="modal_btn_add_members">Añadir Miembros</span>
+                    <i class="fas fa-user-plus"></i> <span id="modalAddMiembrosBtn">Añadir Miembros</span>
                 </button>
             </div>
         </div>

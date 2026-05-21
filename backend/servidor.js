@@ -293,12 +293,12 @@ app.get("/api/grupos", ah(async (req, res) => {
 
 // Crear grupo + insertar admin en miembro_grupo
 app.post("/api/grupos", ah(async (req, res) => {
-    const { nombre, descripcion, divisa, id_admin } = req.body;
+    const { nombre, descripcion, divisa, id_admin, tipo } = req.body;
     if (!nombre || !id_admin) return res.status(400).json({ error: "Faltan campos" });
 
     const [r] = await poolBD.execute(
-        "INSERT INTO grupo (nombre, descripcion, divisa, id_admin) VALUES (?,?,?,?)",
-        [nombre, descripcion || null, divisa || 'EUR', Number(id_admin)]
+        "INSERT INTO grupo (nombre, descripcion, divisa, id_admin, tipo) VALUES (?,?,?,?,?)",
+        [nombre, descripcion || null, divisa || 'EUR', Number(id_admin), tipo || 'clasico']
     );
 
     await poolBD.execute(
@@ -405,7 +405,7 @@ app.get("/api/grupos/:id_grupo", ah(async (req, res) => {
     if (!grupo) return res.status(404).json({ error: "Grupo no encontrado" });
 
     const [miembros] = await poolBD.execute(
-        `SELECT u.id_usuario, u.nombre, u.nombre_usuario, u.correo_electronico, mg.rol
+        `SELECT u.id_usuario, u.nombre, u.nombre_usuario, u.correo_electronico, mg.rol, COALESCE(u.offline,0) AS offline
      FROM miembro_grupo mg
      JOIN usuario u ON u.id_usuario = mg.id_usuario
      WHERE mg.id_grupo = ?`,
@@ -453,6 +453,33 @@ app.get("/api/grupos/:id_grupo", ah(async (req, res) => {
     }));
 
     res.json({ grupo, miembros, transacciones: transaccionesConParticipantes });
+}));
+
+// Añadir miembro offline (crea usuario virtual sin cuenta)
+app.post("/api/grupos/:id_grupo/miembros/offline", ah(async (req, res) => {
+    const id_grupo = Number(req.params.id_grupo);
+    const { nombre } = req.body;
+    if (!nombre || !nombre.trim()) return res.status(400).json({ error: "El nombre es obligatorio" });
+
+    // Crear usuario offline (sin email ni contraseña)
+    const nombreLimpio = nombre.trim();
+    const usernameUnico = `offline_${id_grupo}_${Date.now()}`;
+
+    const [r] = await poolBD.execute(
+        "INSERT INTO usuario (nombre, nombre_usuario, correo_electronico, hash_contrasena, offline) VALUES (?,?,NULL,'',1)",
+        [nombreLimpio, usernameUnico]
+    );
+    const id_usuario = r.insertId;
+
+    // Añadir directamente al grupo (sin invitación)
+    await poolBD.execute(
+        "INSERT IGNORE INTO miembro_grupo (id_grupo, id_usuario, rol) VALUES (?,?,'miembro')",
+        [id_grupo, id_usuario]
+    );
+
+    await insertarLog(id_grupo, id_usuario, "miembro_añadido", `"${nombreLimpio}" añadido como participante offline`);
+
+    res.status(201).json({ id_usuario, nombre: nombreLimpio, username: usernameUnico, offline: true });
 }));
 
 // Editar grupo (solo admin)
@@ -901,6 +928,15 @@ poolBD.execute(`
         UNIQUE KEY uq_inv (id_grupo, id_usuario, estado)
     )
 `).catch(err => console.warn("[migración] invitacion_grupo:", err.message));
+
+poolBD.execute(`ALTER TABLE grupo ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) DEFAULT 'clasico'`)
+    .catch(err => console.warn("[migración] tipo en grupo:", err.message));
+
+poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS offline TINYINT(1) DEFAULT 0`)
+    .catch(err => console.warn("[migración] offline en usuario:", err.message));
+
+poolBD.execute(`ALTER TABLE usuario MODIFY COLUMN correo_electronico VARCHAR(255) NULL`)
+    .catch(err => console.warn("[migración] correo_electronico nullable:", err.message));
 
 app.listen(PUERTO, () => {
     console.log(`API escuchando en http://localhost:${PUERTO}`);

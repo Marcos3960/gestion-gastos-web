@@ -181,16 +181,83 @@ function setupAppListeners() {
 
   // Crear grupo
   let miembrosSeleccionadosGlobal = [];
-  
-  document.getElementById("btnCrearGrupo").addEventListener("click", () => {
+  let miembrosOfflineGlobal = []; // { nombre: string }[]
+
+  function resetModalCrearGrupo() {
     miembrosSeleccionadosGlobal = [];
-    document.getElementById("buscarUsuario").value = "";
+    miembrosOfflineGlobal = [];
+    document.getElementById("formCrearGrupo").reset();
+    document.getElementById("formCrearGrupo").style.display = "none";
+    document.getElementById("stepTipoGrupo").style.display = "";
+    document.getElementById("modalCrearGrupoTitle").textContent = "Crear Nuevo Grupo";
     document.getElementById("resultadosBusqueda").innerHTML = "";
     document.getElementById("miembrosSeleccionados").innerHTML = "";
+    document.getElementById("miembrosOfflineList").innerHTML = "";
+    document.getElementById("nombreMiembroOffline").value = "";
     const divisaSelect = document.getElementById("divisaGrupo");
     if (divisaSelect) divisaSelect.value = localStorage.getItem("monedaDefault") || "EUR";
+  }
+
+  document.getElementById("btnCrearGrupo").addEventListener("click", () => {
+    resetModalCrearGrupo();
     openModal("modalCrearGrupo");
   });
+
+  // Paso 1: seleccionar tipo
+  document.querySelectorAll(".group-type-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const tipo = card.dataset.tipo;
+      document.getElementById("tipoGrupoInput").value = tipo;
+      document.getElementById("stepTipoGrupo").style.display = "none";
+      document.getElementById("formCrearGrupo").style.display = "";
+      document.getElementById("modalCrearGrupoTitle").textContent =
+        tipo === "offline" ? "Nuevo Grupo Offline" : "Nuevo Grupo Clásico";
+      document.getElementById("seccionMiembrosClasico").style.display = tipo === "clasico" ? "" : "none";
+      document.getElementById("seccionMiembrosOffline").style.display = tipo === "offline" ? "" : "none";
+    });
+  });
+
+  document.getElementById("btnVolverTipoGrupo").addEventListener("click", () => {
+    document.getElementById("formCrearGrupo").style.display = "none";
+    document.getElementById("stepTipoGrupo").style.display = "";
+    document.getElementById("modalCrearGrupoTitle").textContent = "Crear Nuevo Grupo";
+  });
+
+  // Añadir miembro offline
+  document.getElementById("btnAddOfflineMember").addEventListener("click", () => {
+    const input = document.getElementById("nombreMiembroOffline");
+    const nombre = input.value.trim();
+    if (!nombre) return;
+    if (miembrosOfflineGlobal.find(m => m.nombre.toLowerCase() === nombre.toLowerCase())) {
+      showPopup("Ya has añadido ese nombre", "warning"); return;
+    }
+    miembrosOfflineGlobal.push({ nombre });
+    input.value = "";
+    actualizarMiembrosOffline();
+  });
+
+  document.getElementById("nombreMiembroOffline").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("btnAddOfflineMember").click(); }
+  });
+
+  function actualizarMiembrosOffline() {
+    const container = document.getElementById("miembrosOfflineList");
+    if (miembrosOfflineGlobal.length === 0) { container.innerHTML = ""; return; }
+    container.innerHTML = miembrosOfflineGlobal.map((m, i) => `
+      <div class="selected-member">
+        <div class="selected-member-info">
+          <strong>${escapeHtml(m.nombre)}</strong>
+          <small>Offline</small>
+        </div>
+        <button type="button" class="btn-remove-user" data-idx="${i}"><i class="fas fa-times"></i></button>
+      </div>`).join("");
+    container.querySelectorAll(".btn-remove-user").forEach(btn => {
+      btn.addEventListener("click", () => {
+        miembrosOfflineGlobal.splice(Number(btn.dataset.idx), 1);
+        actualizarMiembrosOffline();
+      });
+    });
+  }
 
   // Búsqueda de usuarios para crear grupo
   let busquedaTimeout;
@@ -294,15 +361,34 @@ function setupAppListeners() {
     const nombre = document.getElementById("nombreGrupo").value;
     const descripcion = document.getElementById("descripcionGrupo").value;
     const divisa = document.getElementById("divisaGrupo").value;
-
-    const miembrosIds = miembrosSeleccionadosGlobal.map(m => m.id);
+    const tipo = document.getElementById("tipoGrupoInput").value;
 
     try {
-      await gruposManager.crearGrupo(nombre, descripcion, divisa, miembrosIds);
+      const data = await gruposManager.crearGrupo(nombre, descripcion, divisa, [], tipo);
+      const grupoId = data.id_grupo;
+
+      if (tipo === "clasico" && miembrosSeleccionadosGlobal.length > 0) {
+        const currentUser = authManager.getCurrentUser();
+        await fetch(`${API_URL}/grupos/${grupoId}/miembros`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuarios_ids: miembrosSeleccionadosGlobal.map(m => Number(m.id)), id_invitador: Number(currentUser.id) })
+        });
+      }
+
+      if (tipo === "offline") {
+        for (const m of miembrosOfflineGlobal) {
+          await fetch(`${API_URL}/grupos/${grupoId}/miembros/offline`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nombre: m.nombre })
+          });
+        }
+      }
+
       closeModal("modalCrearGrupo");
       await loadGrupos();
-      e.target.reset();
-      miembrosSeleccionadosGlobal = [];
+      resetModalCrearGrupo();
     } catch (error) {
       showPopup(error.message, "error");
     }
@@ -711,8 +797,9 @@ async function verDetalleGrupo(grupoId) {
           <div class="miembro-info">
             <strong>${escapeHtml(m.nombre)}</strong>
             ${m.rol === 'admin' ? '<span class="badge-admin">Admin</span>' : ''}
+            ${m.offline ? '<span class="badge-offline">Offline</span>' : ''}
           </div>
-          <small>@${escapeHtml(m.nombreUsuario || m.email)}</small>
+          <small>${m.offline ? 'Sin cuenta' : '@' + escapeHtml(m.nombreUsuario || m.email)}</small>
         </div>
       </div>
       ${(esAdmin && m.id !== grupo.adminId) ? `
@@ -1533,11 +1620,61 @@ function abrirMiembrosGrupo(grupoId) {
 async function abrirModalAddMiembros(grupoId) {
   grupoIdActualAddMiembros = grupoId;
   miembrosSeleccionadosGrupoGlobal = [];
+  miembrosOfflineGrupoGlobal = [];
+
   document.getElementById("buscarUsuarioGrupo").value = "";
   document.getElementById("resultadosBusquedaGrupo").innerHTML = "";
   document.getElementById("miembrosSeleccionadosGrupo").innerHTML = "";
+  document.getElementById("nombreMiembroOfflineGrupo").value = "";
+  document.getElementById("miembrosOfflineGrupoList").innerHTML = "";
+
+  const grupo = gruposManager.obtenerGrupo(grupoId);
+  const esOffline = grupo?.tipo === "offline";
+
+  document.getElementById("addMiembrosSeccionClasico").style.display = esOffline ? "none" : "";
+  document.getElementById("addMiembrosSeccionOffline").style.display = esOffline ? "" : "none";
+  document.getElementById("modalAddMiembrosTitle").textContent = esOffline ? "Añadir Participante Offline" : "Añadir Miembros";
+  document.getElementById("modalAddMiembrosSubtitle").textContent = esOffline
+    ? "Introduce el nombre del participante"
+    : "Busca y selecciona usuarios para añadir";
+  document.getElementById("modalAddMiembrosBtn").textContent = esOffline ? "Añadir Participante" : "Añadir Miembros";
+
   openModal("modalAddMiembros");
 }
+
+let miembrosOfflineGrupoGlobal = [];
+
+function actualizarMiembrosOfflineGrupo() {
+  const container = document.getElementById("miembrosOfflineGrupoList");
+  if (miembrosOfflineGrupoGlobal.length === 0) { container.innerHTML = ""; return; }
+  container.innerHTML = miembrosOfflineGrupoGlobal.map((m, i) => `
+    <div class="selected-member">
+      <div class="selected-member-info">
+        <strong>${escapeHtml(m.nombre)}</strong>
+        <small>Offline</small>
+      </div>
+      <button type="button" class="btn-remove-user" data-idx="${i}"><i class="fas fa-times"></i></button>
+    </div>`).join("");
+  container.querySelectorAll(".btn-remove-user").forEach(btn => {
+    btn.addEventListener("click", () => {
+      miembrosOfflineGrupoGlobal.splice(Number(btn.dataset.idx), 1);
+      actualizarMiembrosOfflineGrupo();
+    });
+  });
+}
+
+document.getElementById("btnAddOfflineMemberGrupo").addEventListener("click", () => {
+  const input = document.getElementById("nombreMiembroOfflineGrupo");
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  miembrosOfflineGrupoGlobal.push({ nombre });
+  input.value = "";
+  actualizarMiembrosOfflineGrupo();
+});
+
+document.getElementById("nombreMiembroOfflineGrupo").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("btnAddOfflineMemberGrupo").click(); }
+});
 
 // Búsqueda de usuarios para añadir a grupo existente
 let busquedaGrupoTimeout;
@@ -1638,24 +1775,40 @@ function actualizarMiembrosSeleccionadosGrupo() {
 
 document.getElementById("formAddMiembros").addEventListener("submit", async (e) => {
   e.preventDefault();
-  
-  if (miembrosSeleccionadosGrupoGlobal.length === 0) {
-    showPopup("Debes seleccionar al menos un miembro", "warning");
-    return;
-  }
+  const grupo = gruposManager.obtenerGrupo(grupoIdActualAddMiembros);
+  const esOffline = grupo?.tipo === "offline";
 
   try {
-    const currentUser = authManager.getCurrentUser();
-    const miembrosIds = miembrosSeleccionadosGrupoGlobal.map(m => Number(m.id));
-    await fetch(`${API_URL}/grupos/${grupoIdActualAddMiembros}/miembros`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuarios_ids: miembrosIds, id_invitador: currentUser.id })
-    });
-
-    closeModal("modalAddMiembros");
-    miembrosSeleccionadosGrupoGlobal = [];
-    showPopup("Invitaciones enviadas correctamente", "success");
+    if (esOffline) {
+      if (miembrosOfflineGrupoGlobal.length === 0) {
+        showPopup("Introduce al menos un nombre", "warning"); return;
+      }
+      for (const m of miembrosOfflineGrupoGlobal) {
+        await fetch(`${API_URL}/grupos/${grupoIdActualAddMiembros}/miembros/offline`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre: m.nombre })
+        });
+      }
+      closeModal("modalAddMiembros");
+      miembrosOfflineGrupoGlobal = [];
+      await verDetalleGrupo(grupoIdActualAddMiembros);
+      showPopup("Participante añadido correctamente", "success");
+    } else {
+      if (miembrosSeleccionadosGrupoGlobal.length === 0) {
+        showPopup("Debes seleccionar al menos un miembro", "warning"); return;
+      }
+      const currentUser = authManager.getCurrentUser();
+      const miembrosIds = miembrosSeleccionadosGrupoGlobal.map(m => Number(m.id));
+      await fetch(`${API_URL}/grupos/${grupoIdActualAddMiembros}/miembros`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuarios_ids: miembrosIds, id_invitador: currentUser.id })
+      });
+      closeModal("modalAddMiembros");
+      miembrosSeleccionadosGrupoGlobal = [];
+      showPopup("Invitaciones enviadas correctamente", "success");
+    }
   } catch (error) {
     showPopup("Error al añadir miembros: " + error.message, "error");
   }

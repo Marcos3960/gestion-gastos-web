@@ -22,7 +22,7 @@ class GruposManager {
         }));
     }
 
-    async crearGrupo(nombre, descripcion, divisa, miembrosIds) {
+    async crearGrupo(nombre, descripcion, divisa, miembrosIds, tipo = 'clasico') {
         const currentUser = authManager.getCurrentUser();
         const resp = await fetch(`${API_URL}/grupos`, {
             method: "POST",
@@ -31,7 +31,8 @@ class GruposManager {
                 nombre,
                 descripcion,
                 divisa: divisa || 'EUR',
-                id_admin: Number(currentUser.id)
+                id_admin: Number(currentUser.id),
+                tipo
             })
         });
         if (!resp.ok) {
@@ -39,20 +40,7 @@ class GruposManager {
             throw new Error(err.error || "No se pudo crear el grupo");
         }
 
-        const data = await resp.json();
-        const id_grupo = data.id_grupo;
-
-        // Añadir miembros por ID
-        const ids = (miembrosIds || []).map(id => Number(id)).filter(Boolean);
-        if (ids.length) {
-            await fetch(`${API_URL}/grupos/${id_grupo}/miembros`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ usuarios_ids: ids })
-            });
-        }
-
-        return String(id_grupo);
+        return await resp.json(); // devuelve { id_grupo }
     }
 
     async cargarDetalleGrupo(idGrupo) {
@@ -73,12 +61,14 @@ class GruposManager {
             divisa: d.grupo.divisa || 'EUR',
             adminId: String(d.grupo.id_admin),
             fechaCreacion: d.grupo.fecha_creacion,
+            tipo: d.grupo.tipo || 'clasico',
             miembros: (d.miembros || []).map(m => ({
                 id: String(m.id_usuario),
                 nombre: m.nombre,
                 nombreUsuario: m.nombre_usuario,
                 email: m.correo_electronico,
-                rol: m.rol
+                rol: m.rol,
+                offline: !!m.offline
             })),
             transacciones: (d.transacciones || []).map(t => ({
                 id: String(t.id_transaccion),
