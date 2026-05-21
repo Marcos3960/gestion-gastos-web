@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Program Files/**)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MariaDB 12.1\\\\bin\\\\mysql.exe\" -u root -pkalcetin -P 3307 -e \"SELECT VERSION\\(\\);\" 2>&1)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MariaDB 12.1\\\\bin\\\\mysql.exe\" -u root -pkalcetin -P 3307 -e \"CREATE DATABASE IF NOT EXISTS apaxas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\" 2>&1)",
+      "Bash(python -c ' *)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('js/app.js','utf8'\\);const m=c.match\\(/function obtenerInicialesNombre[\\\\s\\\\S]{0,200}/\\);console.log\\(m?m[0]:'NOT FOUND'\\)\")"
+    ]
+  }
+}

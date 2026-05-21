@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apaxas - Gestión de Gastos Compartidos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/menu.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+    <!-- PANTALLA DE LOGIN -->
+    <div id="loginScreen" class="screen">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1>Apaxas</h1>
+                <p class="subtitle">Gestiona tus gastos compartidos</p>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginIdentifier">Correo electrónico o nombre de usuario</label>
+                        <input type="text" id="loginIdentifier" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Contraseña</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Iniciar sesión</button>
+                </form>
+
+                <p class="auth-switch">
+                    ¿No tienes cuenta? <a href="#" id="showRegister">Regístrate</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE REGISTRO -->
+    <div id="registerScreen" class="screen">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1>Crear cuenta</h1>
+                <p class="subtitle">Únete a Apaxas</p>
+
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerName">Nombre</label>
+                        <input type="text" id="registerName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerUsername">Nombre de usuario</label>
+                        <input type="text" id="registerUsername" required placeholder="ej. juan_garcia">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerEmail">Correo electrónico</label>
+                        <input type="email" id="registerEmail" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="registerPassword">Contraseña</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Registrarse</button>
+                </form>
+
+                <p class="auth-switch">
+                    ¿Ya tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA PRINCIPAL DE LA APP -->
+    <div id="appScreen" class="screen">
+
+        <!-- TOP NAV -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-logo">Apaxas</h1>
+            </div>
+            <div class="header-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="buscarGrupos" placeholder="Buscar grupos...">
+            </div>
+            <div class="header-right">
+                <button class="icon-btn" id="notificationsBtn">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge" id="notificationBadge">0</span>
+                </button>
+                <div class="header-avatar" id="headerAvatar">
+                    <span id="headerAvatarInitials">?</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- SIDEBAR NAV (desktop) -->
+        <aside class="app-sidebar">
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-view="grupos">
+                    <i class="fas fa-users"></i>
+                    <span data-i18n="nav_grupos">Grupos</span>
+                </button>
+                <button class="nav-item" data-view="estadisticas">
+                    <i class="fas fa-chart-pie"></i>
+                    <span data-i18n="nav_estadisticas">Estadísticas</span>
+                </button>
+                <button class="nav-item" data-view="ajustes">
+                    <i class="fas fa-cog"></i>
+                    <span data-i18n="nav_ajustes">Ajustes</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- BOTTOM NAV (mobile) -->
+        <nav class="app-nav">
+            <button class="nav-item active" data-view="grupos">
+                <i class="fas fa-users"></i>
+                <span data-i18n="nav_grupos">Grupos</span>
+            </button>
+            <button class="nav-item" data-view="estadisticas">
+                <i class="fas fa-chart-pie"></i>
+                <span data-i18n="nav_estadisticas">Estadísticas</span>
+            </button>
+            <button class="nav-item" data-view="ajustes">
+                <i class="fas fa-cog"></i>
+                <span data-i18n="nav_ajustes">Ajustes</span>
+            </button>
+        </nav>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="app-main">
+
+            <!-- VISTA: GRUPOS -->
+            <div id="grupos" class="view active">
+                <div class="view-header">
+                    <div class="view-header-text">
+                        <h2 data-i18n="groups_title">Grupos de Gastos</h2>
+                        <p class="view-subtitle" data-i18n="groups_subtitle">Gestiona y divide gastos con tus grupos.</p>
+                    </div>
+                    <button class="btn-primary" id="btnCrearGrupo">
+                        <i class="fas fa-plus"></i> <span data-i18n="btn_create_group">Crear Grupo</span>
+                    </button>
+                </div>
+
+                <div id="gruposList" class="grupos-grid">
+                    <!-- Los grupos se cargarán aquí dinámicamente -->
+                </div>
+            </div>
+
+            <!-- VISTA: DETALLE DE GRUPO -->
+            <div id="detalleGrupo" class="view">
+
+                <!-- Group Hero Header -->
+                <div class="grupo-detalle-hero">
+                    <div class="grupo-detalle-hero-top">
+                        <button class="btn-back" id="btnBackToGrupos">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </button>
+                        <span class="grupo-detalle-overline">GROUP OVERVIEW</span>
+                    </div>
+                    <div class="grupo-detalle-title-row">
+                        <div class="grupo-detalle-title-left">
+                            <h2 id="detalleGrupoNombre">Nombre del Grupo</h2>
+                            <span class="badge-divisa" id="detalleGrupoDivisa">EUR</span>
+                        </div>
+                        <div class="grupo-detalle-balance-chip">
+                            <span class="grupo-detalle-balance-label">Total gastado</span>
+                            <span class="grupo-detalle-balance-value" id="detalleGrupoTotalGasto">0.00</span>
+                        </div>
+                    </div>
+                    <p id="detalleGrupoDescripcion" class="grupo-detalle-desc">Sin descripción</p>
+                </div>
+
+                <!-- Actions Bar -->
+                <div class="grupo-actions-bar" id="grupoActions"></div>
+
+                <!-- Tab Bar -->
+                <div class="grupo-tabs">
+                    <button class="grupo-tab active" data-tab="overview" data-i18n="tab_overview">Vista General</button>
+                    <button class="grupo-tab" data-tab="transacciones" data-i18n="tab_transactions">Transacciones</button>
+                    <button class="grupo-tab" data-tab="actividad" data-i18n="tab_activity">Actividad</button>
+                </div>
+
+                <!-- Tab: Vista General -->
+                <div class="grupo-tab-panel" id="tabOverview">
+                    <div class="grupo-overview-grid">
+                        <div class="grupo-overview-card">
+                            <div class="grupo-overview-card-title" data-i18n="overview_balances">BALANCES</div>
+                            <div id="detalleGrupoBalances" class="balances-list"></div>
+                        </div>
+                        <div class="grupo-overview-card">
+                            <div class="grupo-overview-card-title" data-i18n="overview_members">MIEMBROS</div>
+                            <div id="detalleGrupoMiembros" class="miembros-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Transacciones -->
+                <div class="grupo-tab-panel" id="tabTransacciones" style="display:none">
+                    <div class="tx-layout">
+                        <!-- Sidebar izquierdo -->
+                        <aside class="tx-sidebar">
+                            <div class="tx-filters-card">
+                                <p class="tx-chart-title" data-i18n="tx_search_title">BUSCAR</p>
+                                <div class="tx-search-wrap">
+                                    <i class="fas fa-search tx-search-icon"></i>
+                                    <input type="text" id="txSearchInput" class="tx-search-input" data-i18n-ph="tx_search_placeholder" placeholder="Buscar gastos...">
+                                </div>
+                            </div>
+                            <div class="tx-filters-card">
+                                <p class="tx-chart-title" data-i18n="tx_estado_title">ESTADO</p>
+                                <div class="tx-filter-group" id="txEstadoFilters">
+                                    <button class="tx-filter-btn active" data-estado="todos" data-i18n="tx_filter_all">Todos</button>
+                                    <button class="tx-filter-btn" data-estado="pagado" data-i18n="tx_filter_paid">Pagadas</button>
+                                    <button class="tx-filter-btn" data-estado="pendiente" data-i18n="tx_filter_pending">Pendientes</button>
+                                </div>
+                                <p class="tx-chart-title" style="margin-top:0.75rem" data-i18n="tx_pagador_title">PAGADOR</p>
+                                <div class="tx-filter-group" id="txUsuarioFilters">
+                                    <button class="tx-filter-btn active" data-usuario="todos" data-i18n="tx_filter_all">Todos</button>
+                                </div>
+                            </div>
+                            <div class="tx-chart-card">
+                                <p class="tx-chart-title" data-i18n="tx_chart_title">GASTO MENSUAL</p>
+                                <canvas id="txMonthlyChart" height="160"></canvas>
+                            </div>
+                        </aside>
+                        <!-- Lista derecha -->
+                        <div class="tx-main">
+                            <div class="tx-list-header">
+                                <span class="tx-list-label" data-i18n="tx_recent_title">TRANSACCIONES RECIENTES</span>
+                                <span id="txCount" class="tx-list-count"></span>
+                            </div>
+                            <div id="detalleGrupoTransacciones" class="tx-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Actividad -->
+                <div class="grupo-tab-panel" id="tabActividad" style="display:none">
+                    <div class="log-layout">
+                        <!-- Sidebar izquierdo -->
+                        <aside class="log-sidebar">
+                            <div class="tx-filters-card">
+                                <p class="tx-chart-title" data-i18n="tx_search_title">BUSCAR</p>
+                                <div class="tx-search-wrap">
+                                    <i class="fas fa-search tx-search-icon"></i>
+                                    <input type="text" id="logSearchInput" class="tx-search-input" data-i18n-ph="log_search_placeholder" placeholder="Buscar actividad...">
+                                </div>
+                            </div>
+                            <div class="tx-filters-card">
+                                <p class="tx-chart-title" data-i18n="log_persona_title">PERSONA</p>
+                                <div class="tx-filter-group" id="logUsuarioFilters">
+                                    <button class="tx-filter-btn active" data-usuario="todos">Todos</button>
+                                </div>
+                            </div>
+                        </aside>
+                        <!-- Lista principal -->
+                        <div id="logContainer">
+                            <div class="log-header-bar">
+                                <span class="log-header-title" data-i18n="log_recent_title">ACTIVIDAD RECIENTE</span>
+                                <button class="log-toggle-btn" id="btnToggleLog" title="Mostrar todo">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div id="logList" class="log-list"></div>
+                            <button class="btn-log-more" id="btnMostrarMasLog" style="display:none"></button>
+                        </div>
+                    </div>
+                    <span id="logHeader" style="display:none"></span>
+                    <span id="logChevron" style="display:none"></span>
+                </div>
+
+            </div>
+
+            <!-- VISTA: ESTADÍSTICAS -->
+            <div id="estadisticas" class="view">
+
+                <!-- Fila superior: balance consolidado -->
+                <div class="st-balance-card">
+                    <p class="st-label" data-i18n="stats_balance_title">BALANCE CONSOLIDADO</p>
+                    <div class="st-balance-main">
+                        <div class="st-net-wrap">
+                            <h2 id="stNetBalance" class="st-net">€0.00</h2>
+                            <span id="stTrend" class="st-trend"></span>
+                        </div>
+                        <div class="st-split">
+                            <div class="st-split-item">
+                                <span class="st-split-label"><i class="fas fa-arrow-down"></i> <span data-i18n="stats_me_deben">ME DEBEN</span></span>
+                                <span id="stTeDeben" class="st-split-val pos">€0.00</span>
+                            </div>
+                            <div class="st-split-divider"></div>
+                            <div class="st-split-item">
+                                <span class="st-split-label"><i class="fas fa-arrow-up"></i> <span data-i18n="stats_debo">DEBO</span></span>
+                                <span id="stDebo" class="st-split-val neg">€0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fila media: gráfica + saldos por contacto -->
+                <div class="st-mid-row">
+                    <div class="st-card st-chart-card">
+                        <p class="st-label" data-i18n="stats_chart_title">TENDENCIAS DE GASTOS (6 MESES)</p>
+                        <div class="st-chart-legend" id="stChartLegend"></div>
+                        <canvas id="statsMonthlyChart" height="200"></canvas>
+                    </div>
+                    <div class="st-card st-contacts-card">
+                        <p class="st-label" data-i18n="stats_contacts_title">SALDOS POR CONTACTO</p>
+                        <div id="stSaldosContacto" class="st-contacts-list"></div>
+                    </div>
+                </div>
+
+                <!-- Historial de transacciones -->
+                <div class="st-card st-history-card">
+                    <div class="st-history-header">
+                        <p class="st-label" data-i18n="stats_history_title">HISTORIAL DE TRANSACCIONES</p>
+                        <span id="stTxCount" class="st-history-count"></span>
+                    </div>
+                    <div class="st-table-wrap">
+                        <table class="st-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="stats_col_group">GRUPO</th>
+                                    <th data-i18n="stats_col_date">FECHA</th>
+                                    <th data-i18n="stats_col_concept">CONCEPTO</th>
+                                    <th data-i18n="stats_col_total">MONTO TOTAL</th>
+                                    <th data-i18n="stats_col_share">TU PARTE</th>
+                                    <th data-i18n="stats_col_status">ESTADO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stHistorialBody"></tbody>
+                        </table>
+                        <div id="stHistorialEmpty" class="st-empty" style="display:none">
+                            <i class="fas fa-receipt"></i>
+                            <p>No hay transacciones</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- VISTA: AJUSTES -->
+            <div id="ajustes" class="view">
+                <div class="aj-layout">
+
+                    <!-- Sidebar izquierda -->
+                    <aside class="aj-sidebar">
+                        <p class="aj-sidebar-label" data-i18n="aj_cat_label">CATEGORÍAS</p>
+                        <nav class="aj-nav">
+                            <a href="#ajPerfil" class="aj-nav-item active" data-i18n-text="aj_nav_perfil">Perfil <i class="fas fa-chevron-right"></i></a>
+                            <a href="#ajPreferencias" class="aj-nav-item" data-i18n-text="aj_nav_preferencias">Preferencias <i class="fas fa-chevron-right"></i></a>
+                            <a href="#ajNotificaciones" class="aj-nav-item" data-i18n-text="aj_nav_notificaciones">Notificaciones <i class="fas fa-chevron-right"></i></a>
+                            <a href="#ajSeguridad" class="aj-nav-item" data-i18n-text="aj_nav_seguridad">Seguridad <i class="fas fa-chevron-right"></i></a>
+                        </nav>
+                    </aside>
+
+                    <!-- Contenido principal -->
+                    <div class="aj-main">
+
+                        <!-- PERFIL DE USUARIO -->
+                        <section class="aj-card" id="ajPerfil">
+                            <div class="aj-card-header">
+                                <p class="aj-section-label" data-i18n="aj_perfil_title">PERFIL DE USUARIO</p>
+                                <div class="aj-profile-btns">
+                                    <button class="aj-edit-btn" id="btnEditarPerfilSettings">
+                                        <i class="fas fa-edit"></i> <span data-i18n="aj_btn_edit">Editar</span>
+                                    </button>
+                                    <button class="aj-edit-btn aj-save-btn" id="btnGuardarPerfilSettings" style="display:none;background:var(--secondary);color:#003824">
+                                        <i class="fas fa-check"></i> <span data-i18n="aj_btn_save">Guardar</span>
+                                    </button>
+                                    <button class="aj-cancel-btn" id="btnCancelarPerfilSettings" style="display:none">
+                                        <span data-i18n="aj_btn_cancel">Cancelar</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="aj-profile-body">
+                                <div class="aj-profile-avatar-wrap">
+                                    <div class="aj-profile-avatar" id="profileCardAvatar">
+                                        <span id="profileCardInitials">?</span>
+                                    </div>
+                                    <label class="aj-avatar-upload" id="ajAvatarUploadLabel" style="display:none" title="Cambiar foto">
+                                        <i class="fas fa-camera"></i>
+                                        <input type="file" id="ajFotoPerfil" accept="image/*" style="display:none">
+                                    </label>
+                                </div>
+                                <div class="aj-profile-fields">
+                                    <div class="aj-field-group">
+                                        <label class="aj-field-label" for="ajEditNombre" data-i18n="aj_field_nombre">Nombre Completo</label>
+                                        <div class="aj-field-value" id="settingsUserName">—</div>
+                                        <input type="text" class="aj-field-input" id="ajEditNombre" style="display:none" placeholder="Nombre completo">
+                                    </div>
+                                    <div class="aj-field-group">
+                                        <label class="aj-field-label" for="ajEditEmail" data-i18n="aj_field_email">Correo Electrónico</label>
+                                        <div class="aj-field-value" id="settingsUserEmail">—</div>
+                                        <input type="email" class="aj-field-input" id="ajEditEmail" style="display:none" placeholder="Correo electrónico">
+                                    </div>
+                                    <div class="aj-field-group">
+                                        <label class="aj-field-label" for="ajEditUsername" data-i18n="aj_field_username">Nombre de usuario</label>
+                                        <div class="aj-field-value" id="settingsUserUsername">—</div>
+                                        <input type="text" class="aj-field-input" id="ajEditUsername" style="display:none" placeholder="Nombre de usuario">
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- PREFERENCIAS -->
+                        <section class="aj-card" id="ajPreferencias">
+                            <p class="aj-section-label" data-i18n="aj_pref_title">PREFERENCIAS DE LA CUENTA</p>
+                            <div class="aj-prefs-row">
+                                <div class="aj-pref-group">
+                                    <label class="aj-field-label" data-i18n="aj_moneda_label">Moneda Principal</label>
+                                    <div class="aj-select-wrap">
+                                        <select class="aj-select" id="ajMoneda">
+                                            <option value="EUR">EUR (€)</option>
+                                            <option value="USD">USD ($)</option>
+                                            <option value="GBP">GBP (£)</option>
+                                            <option value="JPY">JPY (¥)</option>
+                                            <option value="CHF">CHF (Fr)</option>
+                                            <option value="CAD">CAD ($)</option>
+                                            <option value="AUD">AUD ($)</option>
+                                            <option value="MXN">MXN ($)</option>
+                                        </select>
+                                        <i class="fas fa-chevron-down aj-select-arrow"></i>
+                                    </div>
+                                </div>
+                                <div class="aj-pref-group">
+                                    <label class="aj-field-label" data-i18n="aj_idioma_label">Idioma</label>
+                                    <div class="aj-select-wrap">
+                                        <select class="aj-select" id="ajIdioma">
+                                            <option value="es">Español</option>
+                                            <option value="en">English</option>
+                                        </select>
+                                        <i class="fas fa-chevron-down aj-select-arrow"></i>
+                                    </div>
+                                </div>
+                                <div class="aj-pref-group">
+                                    <label class="aj-field-label" data-i18n="aj_tema_label">Tema Visual</label>
+                                    <div class="aj-theme-toggle">
+                                        <button class="aj-theme-btn" id="ajThemeDark">
+                                            <i class="fas fa-moon"></i> <span data-i18n="aj_tema_dark">Oscuro</span>
+                                        </button>
+                                        <button class="aj-theme-btn" id="ajThemeLight">
+                                            <i class="fas fa-sun"></i> <span data-i18n="aj_tema_light">Claro</span>
+                                        </button>
+                                        <input type="checkbox" id="themeToggle" style="display:none">
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- NOTIFICACIONES -->
+                        <section class="aj-card" id="ajNotificaciones">
+                            <p class="aj-section-label" data-i18n="aj_notif_title">NOTIFICACIONES Y ALERTAS</p>
+                            <div class="aj-notif-list">
+                                <div class="aj-notif-item">
+                                    <div class="aj-notif-icon" style="background:rgba(183,196,255,0.1);color:var(--primary)">
+                                        <i class="fas fa-receipt"></i>
+                                    </div>
+                                    <div class="aj-notif-info">
+                                        <span class="aj-notif-title" data-i18n="aj_notif_gastos_title">Nuevos Gastos</span>
+                                        <span class="aj-notif-desc" data-i18n="aj_notif_gastos_desc">Recibir alerta cuando se registra un gasto en tus grupos.</span>
+                                    </div>
+                                    <label class="aj-toggle">
+                                        <input type="checkbox" id="notifGastos" checked>
+                                        <span class="aj-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="aj-notif-item">
+                                    <div class="aj-notif-icon" style="background:rgba(78,222,163,0.1);color:var(--secondary)">
+                                        <i class="fas fa-clock"></i>
+                                    </div>
+                                    <div class="aj-notif-info">
+                                        <span class="aj-notif-title" data-i18n="aj_notif_deudas_title">Recordatorios de Deuda</span>
+                                        <span class="aj-notif-desc" data-i18n="aj_notif_deudas_desc">Avisos semanales sobre saldos pendientes.</span>
+                                    </div>
+                                    <label class="aj-toggle">
+                                        <input type="checkbox" id="notifDeudas" checked>
+                                        <span class="aj-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="aj-notif-item">
+                                    <div class="aj-notif-icon" style="background:rgba(255,180,171,0.1);color:var(--error)">
+                                        <i class="fas fa-user-plus"></i>
+                                    </div>
+                                    <div class="aj-notif-info">
+                                        <span class="aj-notif-title" data-i18n="aj_notif_actividad_title">Actividad de Grupo</span>
+                                        <span class="aj-notif-desc" data-i18n="aj_notif_actividad_desc">Invitaciones y cambios de administración.</span>
+                                    </div>
+                                    <label class="aj-toggle">
+                                        <input type="checkbox" id="notifActividad">
+                                        <span class="aj-toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- SEGURIDAD -->
+                        <section class="aj-card" id="ajSeguridad">
+                            <p class="aj-section-label" data-i18n="aj_seg_title">SEGURIDAD</p>
+                            <div class="aj-security-row">
+
+                                <!-- Cambiar contraseña -->
+                                <div class="aj-security-item aj-security-password">
+                                    <div class="aj-pass-header">
+                                        <div class="aj-security-icon"><i class="fas fa-key"></i></div>
+                                        <span class="aj-security-label" data-i18n="aj_seg_pass_label">Cambiar Contraseña</span>
+                                        <button class="aj-security-btn" id="ajPassToggle" data-i18n="aj_seg_pass_btn">Gestionar</button>
+                                    </div>
+                                    <div class="aj-pass-form" id="ajPassForm" style="display:none">
+                                        <div class="aj-pass-field-full">
+                                            <label class="aj-field-label" data-i18n="aj_seg_pass_actual">Contraseña actual</label>
+                                            <input type="password" class="aj-field-input" id="ajPassActual" placeholder="••••••••">
+                                        </div>
+                                        <div class="aj-pass-field-row">
+                                            <div class="aj-pass-field">
+                                                <label class="aj-field-label" data-i18n="aj_seg_pass_nueva">Nueva contraseña</label>
+                                                <input type="password" class="aj-field-input" id="ajPassNueva" placeholder="••••••••">
+                                            </div>
+                                            <div class="aj-pass-field">
+                                                <label class="aj-field-label" data-i18n="aj_seg_pass_confirm">Confirmar contraseña</label>
+                                                <input type="password" class="aj-field-input" id="ajPassConfirm" placeholder="••••••••">
+                                            </div>
+                                        </div>
+                                        <div class="aj-pass-actions">
+                                            <button class="aj-cancel-btn" id="ajPassCancelar" data-i18n="aj_btn_cancel">Cancelar</button>
+                                            <button class="aj-edit-btn" id="ajPassGuardar" style="background:var(--secondary);color:#003824">
+                                                <i class="fas fa-check"></i> <span data-i18n="aj_seg_pass_save">Guardar contraseña</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cerrar sesión -->
+                                <div class="aj-security-item">
+                                    <div class="aj-security-icon" style="background:rgba(255,180,171,0.1);color:var(--error)"><i class="fas fa-sign-out-alt"></i></div>
+                                    <span class="aj-security-label" data-i18n="aj_seg_logout_label">Cerrar sesión</span>
+                                    <button class="aj-security-btn" id="logoutBtn" data-i18n="aj_seg_logout_btn" style="background:rgba(255,180,171,0.1);border-color:rgba(255,180,171,0.2);color:var(--error)">Salir</button>
+                                </div>
+
+                            </div>
+                        </section>
+
+
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- PANEL DE NOTIFICACIONES -->
+        <div id="notificationsPanel" class="side-panel">
+            <div class="panel-header">
+                <h3 data-i18n="notifications_title">Notificaciones</h3>
+                <button class="btn-close" id="closeNotifications">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="notificationsList">
+                <!-- Notificaciones se cargan aquí -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODALES -->
+
+    <!-- Modal: Crear Grupo -->
+    <div id="modalCrearGrupo" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="modal_create_group_title">Crear Nuevo Grupo</h3>
+                <button class="btn-close" data-close="modalCrearGrupo">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formCrearGrupo">
+                <div class="form-group">
+                    <label for="nombreGrupo" data-i18n="modal_group_name_label">Nombre del grupo</label>
+                    <input type="text" id="nombreGrupo" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="descripcionGrupo" data-i18n="modal_group_desc_label">Descripción (opcional)</label>
+                    <textarea id="descripcionGrupo" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="divisaGrupo" data-i18n="modal_group_currency_label">Divisa</label>
+                    <select id="divisaGrupo" required>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="CHF">CHF (Fr)</option>
+                        <option value="CAD">CAD ($)</option>
+                        <option value="AUD">AUD ($)</option>
+                        <option value="MXN">MXN ($)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="buscarUsuario" data-i18n="modal_group_members_label">Añadir miembros</label>
+                    <input type="text" id="buscarUsuario" data-i18n-ph="modal_group_members_placeholder" placeholder="Buscar por nombre o correo...">
+                    <div id="resultadosBusqueda" class="search-results"></div>
+                    <div id="miembrosSeleccionados" class="selected-members">
+                        <!-- Miembros seleccionados aparecerán aquí -->
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-close="modalCrearGrupo" data-i18n="modal_btn_cancel">Cancelar</button>
+                    <button type="submit" class="btn-primary" data-i18n="modal_btn_create_group">Crear Grupo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Miembros al Grupo -->
+    <div id="modalAddMiembros" class="modal">
+        <div class="modal-content modal-gasto">
+            <div class="modal-gasto-header">
+                <div class="modal-gasto-icon"><i class="fas fa-user-plus"></i></div>
+                <div>
+                    <h3 data-i18n="modal_add_members_title">Añadir Miembros</h3>
+                    <p class="modal-gasto-subtitle" data-i18n="modal_add_members_subtitle">Busca y selecciona usuarios para añadir</p>
+                </div>
+                <button class="btn-close" data-close="modalAddMiembros">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formAddMiembros">
+                <div class="modal-gasto-body">
+                    <div class="form-group">
+                        <label for="buscarUsuarioGrupo" data-i18n="modal_add_members_search_label">Buscar usuario</label>
+                        <input type="text" id="buscarUsuarioGrupo" data-i18n-ph="modal_add_members_search_placeholder" placeholder="Buscar por nombre o usuario...">
+                        <div id="resultadosBusquedaGrupo" class="search-results"></div>
+                    </div>
+                    <div id="miembrosSeleccionadosGrupo" class="selected-members"></div>
+                </div>
+            </form>
+
+            <div class="modal-gasto-footer">
+                <button type="button" class="btn-secondary" data-close="modalAddMiembros">
+                    <i class="fas fa-times"></i> <span data-i18n="modal_btn_cancel">Cancelar</span>
+                </button>
+                <button type="button" class="btn-primary" onclick="document.getElementById('formAddMiembros').requestSubmit()">
+                    <i class="fas fa-user-plus"></i> <span data-i18n="modal_btn_add_members">Añadir Miembros</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Transacción en Grupo -->
+    <div id="modalTransaccionGrupo" class="modal">
+        <div class="modal-content modal-gasto">
+            <div class="modal-gasto-header">
+                <div class="modal-gasto-icon"><i class="fas fa-receipt"></i></div>
+                <div>
+                    <h3 data-i18n="modal_expense_title">Nuevo Gasto</h3>
+                    <p class="modal-gasto-subtitle" data-i18n="modal_expense_subtitle">Registra un gasto compartido</p>
+                </div>
+                <button class="btn-close" data-close="modalTransaccionGrupo">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formTransaccionGrupo">
+                <div class="modal-gasto-body">
+
+                    <div class="form-group modal-gasto-concepto">
+                        <label for="conceptoTransaccionGrupo" data-i18n="modal_expense_concept_label">Concepto</label>
+                        <input type="text" id="conceptoTransaccionGrupo" required data-i18n-ph="modal_expense_concept_placeholder" placeholder="Ej: Cena en restaurante">
+                    </div>
+
+                    <div class="modal-gasto-row">
+                        <div class="form-group">
+                            <label for="montoTransaccionGrupo" data-i18n="modal_expense_amount_label">Importe</label>
+                            <div class="input-prefix-wrap">
+                                <span class="input-prefix">€</span>
+                                <input type="number" id="montoTransaccionGrupo" step="0.01" required placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="fechaTransaccion" data-i18n="modal_expense_date_label">Fecha</label>
+                            <input type="datetime-local" id="fechaTransaccion">
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="containerPagador" style="display: none;">
+                        <label for="pagadorTransaccion" data-i18n="modal_expense_payer_label">¿Quién pagó?</label>
+                        <select id="pagadorTransaccion"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="modal_expense_participants_label">Participantes</label>
+                        <p class="modal-gasto-hint">El importe se dividirá equitativamente entre los seleccionados</p>
+                        <div id="participantesTransaccion" class="participantes-check-group"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imagenTransaccion">Adjuntar ticket <span class="label-optional">opcional</span></label>
+                        <label class="file-upload-label" for="imagenTransaccion">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Seleccionar imagen</span>
+                            <input type="file" id="imagenTransaccion" accept="image/*" style="display:none">
+                        </label>
+                    </div>
+
+                </div>
+
+                <div class="modal-gasto-footer">
+                    <button type="button" class="btn-secondary" data-close="modalTransaccionGrupo" data-i18n="modal_btn_cancel">Cancelar</button>
+                    <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> <span data-i18n="modal_btn_add_expense">Añadir Gasto</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Transacción -->
+    <div id="modalEditarTransaccion" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="modal_edit_expense_title">Editar Gasto</h3>
+                <button class="btn-close" data-close="modalEditarTransaccion">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="formEditarTransaccion">
+                <input type="hidden" id="editTransaccionId">
+                <input type="hidden" id="editTransaccionGrupoId">
+
+                <div class="form-group">
+                    <label for="editConceptoTransaccion"><i class="fas fa-tag"></i> Concepto</label>
+                    <input type="text" id="editConceptoTransaccion" required placeholder="Ej: Cena en restaurante">
+                </div>
+
+                <div class="form-group">
+                    <label for="editMontoTransaccion"><i class="fas fa-euro-sign"></i> Monto</label>
+                    <input type="number" id="editMontoTransaccion" step="0.01" required placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="editFechaTransaccion"><i class="fas fa-calendar-alt"></i> Fecha (opcional)</label>
+                    <input type="datetime-local" id="editFechaTransaccion">
+                </div>
+
+                <div class="form-group" id="editContainerPagador" style="display: none;">
+                    <label for="editPagadorTransaccion"><i class="fas fa-wallet"></i> ¿Quién pagó?</label>
+                    <select id="editPagadorTransaccion">
+                        <!-- Se carga dinámicamente -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-users"></i> ¿Quién debe pagar?</label>
+                    <div id="editParticipantesTransaccion" class="checkbox-group">
+                        <!-- Se carga dinámicamente -->
+                    </div>
+                    <small><i class="fas fa-info-circle"></i> El monto se dividirá equitativamente entre los seleccionados</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-close="modalEditarTransaccion" data-i18n="modal_btn_cancel">Cancelar</button>
+                    <button type="submit" class="btn-primary" data-i18n="modal_btn_save_expense">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Modal: Editar Grupo -->
+    <div id="modalEditarGrupo" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Grupo</h3>
+                <button class="btn-close" data-close="modalEditarGrupo">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="formEditarGrupo">
+                <div class="form-group">
+                    <label for="editNombreGrupo">Nombre del grupo</label>
+                    <input type="text" id="editNombreGrupo" required>
+                </div>
+                <div class="form-group">
+                    <label for="editDescripcionGrupo">Descripción (opcional)</label>
+                    <textarea id="editDescripcionGrupo" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editDivisaGrupo">Divisa</label>
+                    <select id="editDivisaGrupo" required>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="CHF">CHF (Fr)</option>
+                        <option value="CAD">CAD ($)</option>
+                        <option value="AUD">AUD ($)</option>
+                        <option value="MXN">MXN ($)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-close="modalEditarGrupo">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Ver Imagen de Transacción -->
+    <div id="modalVerImagen" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Imagen del gasto</h3>
+                <button class="btn-close" data-close="modalVerImagen">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="text-align: center; padding: 1rem;">
+                <img id="imagenTransaccionViewer" src="" alt="Imagen del gasto" style="max-width: 100%; max-height: 70vh; border-radius: 8px; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/auth.js" defer></script>
+    <script src="js/grupos.js" defer></script>
+    <script src="js/transacciones.js" defer></script>
+    <script src="js/app.js" defer></script>
+</body>
+</html>
