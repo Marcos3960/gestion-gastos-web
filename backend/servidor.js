@@ -87,6 +87,30 @@ async function insertarLog(idGrupo, idUsuario, tipoAccion, descripcion) {
     }
 }
 
+// Helper: insertar notificación (compatible con y sin columna tipo)
+let _notifTieneColumnaTipo = null;
+async function insertarNotificacion(idUsuario, mensaje, tipo) {
+    try {
+        if (_notifTieneColumnaTipo === null) {
+            const [cols] = await poolBD.execute("SHOW COLUMNS FROM notificacion LIKE 'tipo'");
+            _notifTieneColumnaTipo = cols.length > 0;
+        }
+        if (_notifTieneColumnaTipo) {
+            await poolBD.execute(
+                "INSERT INTO notificacion (id_usuario, mensaje, tipo) VALUES (?,?,?)",
+                [idUsuario, mensaje, tipo]
+            );
+        } else {
+            await poolBD.execute(
+                "INSERT INTO notificacion (id_usuario, mensaje) VALUES (?,?)",
+                [idUsuario, mensaje]
+            );
+        }
+    } catch (e) {
+        console.error("[NOTIF ERROR]", e.message);
+    }
+}
+
 // Healthcheck
 app.get("/api/health", ah(async (req, res) => {
     const [r] = await poolBD.execute("SELECT 1 AS ok");
@@ -256,7 +280,8 @@ app.get("/api/grupos", ah(async (req, res) => {
     if (!id_usuario) return res.status(400).json({ error: "id_usuario requerido" });
 
     const [grupos] = await poolBD.execute(
-        `SELECT g.id_grupo, g.nombre, g.descripcion, g.divisa, g.id_admin, g.fecha_creacion
+        `SELECT g.id_grupo, g.nombre, g.descripcion, g.divisa, g.id_admin, g.fecha_creacion,
+            (SELECT COUNT(*) FROM miembro_grupo mg2 WHERE mg2.id_grupo = g.id_grupo) AS num_miembros
      FROM grupo g
      JOIN miembro_grupo mg ON mg.id_grupo = g.id_grupo
      WHERE mg.id_usuario = ?
@@ -287,32 +312,88 @@ app.post("/api/grupos", ah(async (req, res) => {
     res.status(201).json({ id_grupo: r.insertId });
 }));
 
-// Añadir miembros a un grupo por ID de usuario
+// Enviar invitaciones a unirse a un grupo
 app.post("/api/grupos/:id_grupo/miembros", ah(async (req, res) => {
     const id_grupo = Number(req.params.id_grupo);
-    const { usuarios_ids } = req.body;
+    const { usuarios_ids, id_invitador } = req.body;
 
     if (!id_grupo) return res.status(400).json({ error: "id_grupo inválido" });
     if (!Array.isArray(usuarios_ids)) return res.status(400).json({ error: "usuarios_ids debe ser array" });
 
     const [[grupoInfo]] = await poolBD.execute("SELECT nombre FROM grupo WHERE id_grupo = ?", [id_grupo]);
+    const [[invitador]] = await poolBD.execute("SELECT nombre FROM usuario WHERE id_usuario = ?", [Number(id_invitador)]);
 
     for (const id_usuario of usuarios_ids) {
-        await poolBD.execute(
-            "INSERT IGNORE INTO miembro_grupo (id_grupo, id_usuario, rol) VALUES (?,?, 'miembro')",
+        // Saltar si ya es miembro
+        const [[yaMiembro]] = await poolBD.execute(
+            "SELECT 1 FROM miembro_grupo WHERE id_grupo = ? AND id_usuario = ?",
             [id_grupo, Number(id_usuario)]
         );
-        const [[u]] = await poolBD.execute("SELECT nombre FROM usuario WHERE id_usuario = ?", [Number(id_usuario)]);
-        if (u) {
-            await insertarLog(id_grupo, Number(id_usuario), "miembro_añadido", `${u.nombre} se unió al grupo`);
-            // Notificar al nuevo miembro con tipo actividad
-            await poolBD.execute(
-                "INSERT INTO notificacion (id_usuario, mensaje, tipo) VALUES (?,?,?)",
-                [Number(id_usuario), `[actividad] Te han añadido al grupo "${grupoInfo?.nombre || ''}"`, "actividad"]
-            );
-        }
+        if (yaMiembro) continue;
+
+        // Saltar si ya tiene invitación pendiente
+        const [[yaInvitado]] = await poolBD.execute(
+            "SELECT 1 FROM invitacion_grupo WHERE id_grupo = ? AND id_usuario = ? AND estado = 'pendiente'",
+            [id_grupo, Number(id_usuario)]
+        );
+        if (yaInvitado) continue;
+
+        const [inv] = await poolBD.execute(
+            "INSERT INTO invitacion_grupo (id_grupo, id_usuario, id_invitador) VALUES (?,?,?)",
+            [id_grupo, Number(id_usuario), Number(id_invitador)]
+        );
+        const id_invitacion = inv.insertId;
+
+        await insertarNotificacion(
+            Number(id_usuario),
+            `[invitacion:${id_invitacion}] ${invitador?.nombre || 'Alguien'} te ha invitado al grupo "${grupoInfo?.nombre || ''}"`,
+            "actividad"
+        );
     }
 
+    res.json({ ok: true });
+}));
+
+// Aceptar invitación
+app.post("/api/invitaciones/:id_invitacion/aceptar", ah(async (req, res) => {
+    const id_invitacion = Number(req.params.id_invitacion);
+    const { id_usuario } = req.body;
+
+    const [[inv]] = await poolBD.execute(
+        "SELECT * FROM invitacion_grupo WHERE id_invitacion = ? AND id_usuario = ? AND estado = 'pendiente'",
+        [id_invitacion, Number(id_usuario)]
+    );
+    if (!inv) return res.status(404).json({ error: "Invitación no encontrada" });
+
+    await poolBD.execute(
+        "UPDATE invitacion_grupo SET estado = 'aceptada' WHERE id_invitacion = ?",
+        [id_invitacion]
+    );
+    await poolBD.execute(
+        "INSERT IGNORE INTO miembro_grupo (id_grupo, id_usuario, rol) VALUES (?,?,'miembro')",
+        [inv.id_grupo, Number(id_usuario)]
+    );
+    const [[u]] = await poolBD.execute("SELECT nombre FROM usuario WHERE id_usuario = ?", [Number(id_usuario)]);
+    await insertarLog(inv.id_grupo, Number(id_usuario), "miembro_añadido", `${u?.nombre} se unió al grupo`);
+
+    res.json({ ok: true });
+}));
+
+// Rechazar invitación
+app.post("/api/invitaciones/:id_invitacion/rechazar", ah(async (req, res) => {
+    const id_invitacion = Number(req.params.id_invitacion);
+    const { id_usuario } = req.body;
+
+    const [[inv]] = await poolBD.execute(
+        "SELECT * FROM invitacion_grupo WHERE id_invitacion = ? AND id_usuario = ? AND estado = 'pendiente'",
+        [id_invitacion, Number(id_usuario)]
+    );
+    if (!inv) return res.status(404).json({ error: "Invitación no encontrada" });
+
+    await poolBD.execute(
+        "UPDATE invitacion_grupo SET estado = 'rechazada' WHERE id_invitacion = ?",
+        [id_invitacion]
+    );
     res.json({ ok: true });
 }));
 
@@ -536,20 +617,14 @@ app.post("/api/transacciones", ah(async (req, res) => {
 
     for (const m of miembros) {
         if (Number(m.id_usuario) === Number(id_pagador)) continue;
-        // Notificación de nuevo gasto
-        await poolBD.execute(
-            "INSERT INTO notificacion (id_usuario, mensaje, tipo) VALUES (?,?,?)",
-            [m.id_usuario, `[gasto] ${pagador?.nombre || "Alguien"} añadió "${concepto}" por €${monto}`, "gasto"]
-        );
+        await insertarNotificacion(m.id_usuario, `[gasto] ${pagador?.nombre || "Alguien"} añadió "${concepto}" por €${monto}`, "gasto");
     }
 
     // Notificación de deuda para cada participante (excepto el pagador)
-    for (const id_part of participantes) {
+    for (const part of participantes) {
+        const id_part = part?.id_usuario ?? part;
         if (Number(id_part) === Number(id_pagador)) continue;
-        await poolBD.execute(
-            "INSERT INTO notificacion (id_usuario, mensaje, tipo) VALUES (?,?,?)",
-            [Number(id_part), `[deuda] Debes €${partePorPersona} a ${pagador?.nombre || "alguien"} por "${concepto}"`, "deuda"]
-        );
+        await insertarNotificacion(Number(id_part), `[deuda] Debes €${partePorPersona} a ${pagador?.nombre || "alguien"} por "${concepto}"`, "deuda");
     }
 
     await insertarLog(Number(id_grupo), Number(id_pagador), "gasto_creado", `${pagador?.nombre} añadió el gasto "${concepto}" por ${monto}`);
@@ -563,14 +638,16 @@ app.get("/api/transacciones", ah(async (req, res) => {
     if (!id_usuario) return res.status(400).json({ error: "id_usuario requerido" });
 
     const [tx] = await poolBD.execute(
-        `SELECT t.*, g.nombre AS nombre_grupo, u.nombre AS nombre_pagador
-     FROM transaccion t
-     JOIN grupo g ON g.id_grupo = t.id_grupo
-     JOIN miembro_grupo mg ON mg.id_grupo = t.id_grupo
-     JOIN usuario u ON u.id_usuario = t.id_pagador
-     WHERE mg.id_usuario = ?
-     ORDER BY t.fecha_creacion DESC`,
-        [id_usuario]
+        `SELECT t.*, g.nombre AS nombre_grupo, u.nombre AS nombre_pagador,
+            COALESCE(pt.pagado, 0) AS yo_pague
+         FROM transaccion t
+         JOIN grupo g ON g.id_grupo = t.id_grupo
+         JOIN usuario u ON u.id_usuario = t.id_pagador
+         LEFT JOIN participante_transaccion pt
+            ON pt.id_transaccion = t.id_transaccion AND pt.id_usuario = ?
+         WHERE (t.id_pagador = ? OR pt.id_usuario = ?)
+         ORDER BY t.fecha_creacion DESC`,
+        [id_usuario, id_usuario, id_usuario]
     );
     res.json(tx);
 }));
@@ -724,6 +801,39 @@ app.put("/api/transacciones/:id_transaccion", ah(async (req, res) => {
     }
 }));
 
+// Eliminar transacción (solo el pagador o el admin del grupo)
+app.delete("/api/transacciones/:id_transaccion", ah(async (req, res) => {
+    const id_transaccion = Number(req.params.id_transaccion);
+    const id_usuario = Number(req.query.id_usuario || req.body?.id_usuario);
+    console.log('[DELETE transaccion]', { id_transaccion, id_usuario });
+
+    if (!id_usuario) return res.status(400).json({ error: "id_usuario requerido" });
+
+    const [[tx]] = await poolBD.execute(
+        `SELECT t.id_pagador, t.concepto, t.id_grupo, g.id_admin
+         FROM transaccion t
+         JOIN grupo g ON g.id_grupo = t.id_grupo
+         WHERE t.id_transaccion = ?`,
+        [id_transaccion]
+    );
+
+    if (!tx) return res.status(404).json({ error: "Transacción no encontrada" });
+
+    const esPagador = Number(tx.id_pagador) === Number(id_usuario);
+    const esAdmin   = Number(tx.id_admin)   === Number(id_usuario);
+    if (!esPagador && !esAdmin) {
+        return res.status(403).json({ error: "Solo el pagador o el administrador pueden eliminar esta transacción" });
+    }
+
+    await poolBD.execute("DELETE FROM participante_transaccion WHERE id_transaccion = ?", [id_transaccion]);
+    await poolBD.execute("DELETE FROM transaccion WHERE id_transaccion = ?", [id_transaccion]);
+
+    const [[actor]] = await poolBD.execute("SELECT nombre FROM usuario WHERE id_usuario = ?", [Number(id_usuario)]);
+    await insertarLog(tx.id_grupo, Number(id_usuario), "gasto_eliminado", `${actor?.nombre} eliminó el gasto "${tx.concepto}"`);
+
+    res.json({ ok: true });
+}));
+
 // Subir imagen de una transacción
 app.post("/api/transacciones/:id/imagen", upload.single("imagen"), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No se recibió ninguna imagen" });
@@ -776,9 +886,21 @@ process.on("unhandledRejection", (err) => {
     console.error("[unhandledRejection]", err?.message || err);
 });
 
-// Migración: añadir columna tipo a notificacion si no existe
+// Migraciones al arrancar
 poolBD.execute(`ALTER TABLE notificacion ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) DEFAULT 'gasto'`)
     .catch(err => console.warn("[migración] tipo en notificacion:", err.message));
+
+poolBD.execute(`
+    CREATE TABLE IF NOT EXISTS invitacion_grupo (
+        id_invitacion INT AUTO_INCREMENT PRIMARY KEY,
+        id_grupo INT NOT NULL,
+        id_usuario INT NOT NULL,
+        id_invitador INT NOT NULL,
+        estado ENUM('pendiente','aceptada','rechazada') DEFAULT 'pendiente',
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_inv (id_grupo, id_usuario, estado)
+    )
+`).catch(err => console.warn("[migración] invitacion_grupo:", err.message));
 
 app.listen(PUERTO, () => {
     console.log(`API escuchando en http://localhost:${PUERTO}`);

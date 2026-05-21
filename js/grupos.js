@@ -17,7 +17,8 @@ class GruposManager {
             descripcion: g.descripcion,
             divisa: g.divisa || 'EUR',
             adminId: String(g.id_admin),
-            fechaCreacion: g.fecha_creacion
+            fechaCreacion: g.fecha_creacion,
+            numMiembros: Number(g.num_miembros || 0)
         }));
     }
 

@@ -17,65 +17,116 @@
 
     <!-- PANTALLA DE LOGIN -->
     <div id="loginScreen" class="screen">
-        <div class="auth-container">
-            <div class="auth-card">
-                <h1>Apaxas</h1>
-                <p class="subtitle">Gestiona tus gastos compartidos</p>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="loginIdentifier">Correo electrónico o nombre de usuario</label>
-                        <input type="text" id="loginIdentifier" required>
+        <div class="auth-layout">
+            <!-- Panel izquierdo decorativo -->
+            <div class="auth-panel">
+                <div class="auth-panel-inner">
+                    <div class="auth-brand">
+                        <i class="fas fa-wallet auth-brand-icon"></i>
+                        <span class="auth-brand-name">Apaxas</span>
                     </div>
-
-                    <div class="form-group">
-                        <label for="loginPassword">Contraseña</label>
-                        <input type="password" id="loginPassword" required>
+                    <h2 class="auth-panel-title">Controla tus gastos compartidos</h2>
+                    <p class="auth-panel-sub">Divide facturas, lleva el seguimiento de deudas y salda cuentas con tus grupos fácilmente.</p>
+                    <div class="auth-features">
+                        <div class="auth-feature"><i class="fas fa-users"></i><span>Grupos de gasto compartido</span></div>
+                        <div class="auth-feature"><i class="fas fa-chart-pie"></i><span>Estadísticas detalladas</span></div>
+                        <div class="auth-feature"><i class="fas fa-bell"></i><span>Notificaciones en tiempo real</span></div>
                     </div>
-
-                    <button type="submit" class="btn-primary">Iniciar sesión</button>
-                </form>
-
-                <p class="auth-switch">
-                    ¿No tienes cuenta? <a href="#" id="showRegister">Regístrate</a>
-                </p>
+                </div>
+            </div>
+            <!-- Panel derecho: formulario -->
+            <div class="auth-form-panel">
+                <div class="auth-card">
+                    <div class="auth-card-header">
+                        <h1>Bienvenido de nuevo</h1>
+                        <p class="subtitle">Inicia sesión para continuar</p>
+                    </div>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginIdentifier">Correo o nombre de usuario</label>
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="loginIdentifier" placeholder="tu@correo.com" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Contraseña</label>
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="loginPassword" placeholder="••••••••" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-auth">Iniciar sesión</button>
+                    </form>
+                    <p class="auth-switch">
+                        ¿No tienes cuenta? <a href="#" id="showRegister">Regístrate gratis</a>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- PANTALLA DE REGISTRO -->
     <div id="registerScreen" class="screen">
-        <div class="auth-container">
-            <div class="auth-card">
-                <h1>Crear cuenta</h1>
-                <p class="subtitle">Únete a Apaxas</p>
-
-                <form id="registerForm">
-                    <div class="form-group">
-                        <label for="registerName">Nombre</label>
-                        <input type="text" id="registerName" required>
+        <div class="auth-layout">
+            <!-- Panel izquierdo decorativo -->
+            <div class="auth-panel">
+                <div class="auth-panel-inner">
+                    <div class="auth-brand">
+                        <i class="fas fa-wallet auth-brand-icon"></i>
+                        <span class="auth-brand-name">Apaxas</span>
                     </div>
-
-                    <div class="form-group">
-                        <label for="registerUsername">Nombre de usuario</label>
-                        <input type="text" id="registerUsername" required placeholder="ej. juan_garcia">
+                    <h2 class="auth-panel-title">Empieza a gestionar tus gastos hoy</h2>
+                    <p class="auth-panel-sub">Crea tu cuenta en segundos y únete a tus grupos de gasto compartido.</p>
+                    <div class="auth-features">
+                        <div class="auth-feature"><i class="fas fa-users"></i><span>Grupos de gasto compartido</span></div>
+                        <div class="auth-feature"><i class="fas fa-chart-pie"></i><span>Estadísticas detalladas</span></div>
+                        <div class="auth-feature"><i class="fas fa-bell"></i><span>Notificaciones en tiempo real</span></div>
                     </div>
-
-                    <div class="form-group">
-                        <label for="registerEmail">Correo electrónico</label>
-                        <input type="email" id="registerEmail" required>
+                </div>
+            </div>
+            <!-- Panel derecho: formulario -->
+            <div class="auth-form-panel">
+                <div class="auth-card">
+                    <div class="auth-card-header">
+                        <h1>Crear cuenta</h1>
+                        <p class="subtitle">Únete a Apaxas gratis</p>
                     </div>
-
-                    <div class="form-group">
-                        <label for="registerPassword">Contraseña</label>
-                        <input type="password" id="registerPassword" required>
-                    </div>
-
-                    <button type="submit" class="btn-primary">Registrarse</button>
-                </form>
-
-                <p class="auth-switch">
-                    ¿Ya tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
-                </p>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="registerName">Nombre completo</label>
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-id-card"></i>
+                                <input type="text" id="registerName" placeholder="Tu nombre" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="registerUsername">Nombre de usuario</label>
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-at"></i>
+                                <input type="text" id="registerUsername" placeholder="juan_garcia" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="registerEmail">Correo electrónico</label>
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="registerEmail" placeholder="tu@correo.com" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPassword">Contraseña</label>
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="registerPassword" placeholder="••••••••" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-auth">Crear cuenta</button>
+                    </form>
+                    <p class="auth-switch">
+                        ¿Ya tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -119,6 +170,10 @@
                     <span data-i18n="nav_ajustes">Ajustes</span>
                 </button>
             </nav>
+            <button class="sidebar-logout-btn" id="sidebarLogoutBtn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span data-i18n="nav_cerrar_sesion">Cerrar sesión</span>
+            </button>
         </aside>
 
         <!-- BOTTOM NAV (mobile) -->
@@ -574,6 +629,19 @@
 
     <!-- MODALES -->
 
+    <!-- Modal: Confirmar Cerrar Sesión -->
+    <div id="modalConfirmLogout" class="modal">
+        <div class="modal-content modal-confirm">
+            <div class="modal-confirm-icon"><i class="fas fa-sign-out-alt"></i></div>
+            <h3 data-i18n="confirm_logout_title">¿Cerrar sesión?</h3>
+            <p data-i18n="confirm_logout_body">Tu sesión actual se cerrará. Tendrás que volver a iniciar sesión para acceder a tu cuenta.</p>
+            <div class="modal-confirm-actions">
+                <button class="btn-secondary" id="confirmLogoutCancel" data-i18n="confirm_logout_cancel">Cancelar</button>
+                <button class="btn-danger" id="confirmLogoutAccept" data-i18n="confirm_logout_accept">Cerrar sesión</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Crear Grupo -->
     <div id="modalCrearGrupo" class="modal">
         <div class="modal-content">
@@ -730,9 +798,13 @@
 
     <!-- Modal: Editar Transacción -->
     <div id="modalEditarTransaccion" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 data-i18n="modal_edit_expense_title">Editar Gasto</h3>
+        <div class="modal-content modal-gasto">
+            <div class="modal-gasto-header">
+                <div class="modal-gasto-icon"><i class="fas fa-edit"></i></div>
+                <div>
+                    <h3 data-i18n="modal_edit_expense_title">Editar Gasto</h3>
+                    <p class="modal-gasto-subtitle">Modifica los datos del gasto</p>
+                </div>
                 <button class="btn-close" data-close="modalEditarTransaccion">
                     <i class="fas fa-times"></i>
                 </button>
@@ -742,39 +814,41 @@
                 <input type="hidden" id="editTransaccionId">
                 <input type="hidden" id="editTransaccionGrupoId">
 
-                <div class="form-group">
-                    <label for="editConceptoTransaccion"><i class="fas fa-tag"></i> Concepto</label>
-                    <input type="text" id="editConceptoTransaccion" required placeholder="Ej: Cena en restaurante">
-                </div>
-
-                <div class="form-group">
-                    <label for="editMontoTransaccion"><i class="fas fa-euro-sign"></i> Monto</label>
-                    <input type="number" id="editMontoTransaccion" step="0.01" required placeholder="0.00">
-                </div>
-
-                <div class="form-group">
-                    <label for="editFechaTransaccion"><i class="fas fa-calendar-alt"></i> Fecha (opcional)</label>
-                    <input type="datetime-local" id="editFechaTransaccion">
-                </div>
-
-                <div class="form-group" id="editContainerPagador" style="display: none;">
-                    <label for="editPagadorTransaccion"><i class="fas fa-wallet"></i> ¿Quién pagó?</label>
-                    <select id="editPagadorTransaccion">
-                        <!-- Se carga dinámicamente -->
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label><i class="fas fa-users"></i> ¿Quién debe pagar?</label>
-                    <div id="editParticipantesTransaccion" class="checkbox-group">
-                        <!-- Se carga dinámicamente -->
+                <div class="modal-gasto-body">
+                    <div class="form-group modal-gasto-concepto">
+                        <label for="editConceptoTransaccion">Concepto</label>
+                        <input type="text" id="editConceptoTransaccion" required placeholder="Ej: Cena en restaurante">
                     </div>
-                    <small><i class="fas fa-info-circle"></i> El monto se dividirá equitativamente entre los seleccionados</small>
+
+                    <div class="modal-gasto-row">
+                        <div class="form-group">
+                            <label for="editMontoTransaccion">Importe</label>
+                            <div class="input-prefix-wrap">
+                                <span class="input-prefix">€</span>
+                                <input type="number" id="editMontoTransaccion" step="0.01" required placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="editFechaTransaccion">Fecha</label>
+                            <input type="datetime-local" id="editFechaTransaccion">
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="editContainerPagador" style="display: none;">
+                        <label for="editPagadorTransaccion">¿Quién pagó?</label>
+                        <select id="editPagadorTransaccion"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Participantes</label>
+                        <p class="modal-gasto-hint">El importe se dividirá equitativamente entre los seleccionados</p>
+                        <div id="editParticipantesTransaccion" class="participantes-check-group"></div>
+                    </div>
                 </div>
 
-                <div class="modal-actions">
+                <div class="modal-gasto-footer">
                     <button type="button" class="btn-secondary" data-close="modalEditarTransaccion" data-i18n="modal_btn_cancel">Cancelar</button>
-                    <button type="submit" class="btn-primary" data-i18n="modal_btn_save_expense">Guardar cambios</button>
+                    <button type="submit" class="btn-primary"><i class="fas fa-save"></i> <span data-i18n="modal_btn_save_expense">Guardar cambios</span></button>
                 </div>
             </form>
         </div>

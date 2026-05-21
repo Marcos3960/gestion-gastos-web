@@ -88,6 +88,7 @@ class TransaccionesManager {
             monto: Number(t.monto),
             tipo: t.tipo,
             estado: t.estado,
+            yoPague: !!t.yo_pague,
             fecha: t.fecha_transaccion || t.fecha_creacion
         }));
     }

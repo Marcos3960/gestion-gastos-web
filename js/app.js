@@ -92,12 +92,9 @@ function setupAuthListeners() {
   });
 
 
-  // Logout
-  // Logout
-  document.getElementById("logoutBtn").addEventListener("click", () => {
-    authManager.logout();
-    // Recargar la página para limpiar todos los datos
-    window.location.reload();
+  // Logout (handler de loginScreen, no necesario en app screen)
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
+    document.getElementById("modalConfirmLogout")?.classList.add("active");
   });
 
 
@@ -115,13 +112,27 @@ function setupAppListeners() {
   }
 
 
-  // Logout desde ajustes
-  document.getElementById("logoutBtn")?.addEventListener("click", () => {
+  function mostrarConfirmLogout() {
+    document.getElementById("modalConfirmLogout").classList.add("active");
+  }
+
+  document.getElementById("confirmLogoutCancel")?.addEventListener("click", () => {
+    document.getElementById("modalConfirmLogout").classList.remove("active");
+  });
+
+  document.getElementById("confirmLogoutAccept")?.addEventListener("click", () => {
+    document.getElementById("modalConfirmLogout").classList.remove("active");
     authManager.logout();
     showScreen("loginScreen");
     document.getElementById("loginIdentifier").value = "";
     document.getElementById("loginPassword").value = "";
   });
+
+  // Logout desde ajustes
+  document.getElementById("logoutBtn")?.addEventListener("click", mostrarConfirmLogout);
+
+  // Logout desde sidebar
+  document.getElementById("sidebarLogoutBtn")?.addEventListener("click", mostrarConfirmLogout);
 
 
 
@@ -581,7 +592,7 @@ async function loadGrupos() {
 
   container.innerHTML = grupos.map(grupo => {
     const inicial = (grupo.nombre || "G")[0].toUpperCase();
-    const numMiembros = (grupo.miembros || []).length;
+    const numMiembros = grupo.numMiembros ?? 0;
     return `
     <div class="grupo-card" data-grupo-id="${grupo.id}">
       <div class="grupo-card-header">
@@ -830,10 +841,14 @@ function renderTransaccionItem(t, grupoId, esAdmin, currentUser, divisa) {
     </div>
   ` : '';
 
-  const actionsHtml = (t.tieneImagen || esAdmin) ? `
+  const esPagador = String(t.pagadorId || t.id_pagador) === String(currentUser.id);
+  const puedeEliminar = esAdmin || esPagador;
+
+  const actionsHtml = (t.tieneImagen || esAdmin || puedeEliminar) ? `
     <div class="tx-actions">
       ${t.tieneImagen ? `<button class="tx-btn-action" onclick="verImagenTransaccion('${t.id}')"><i class="fas fa-image"></i> Ver imagen</button>` : ''}
       ${esAdmin ? `<button class="tx-btn-action edit" onclick="abrirModalEditarTransaccion('${grupoId}','${t.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
+      ${puedeEliminar ? `<button class="tx-btn-action danger" onclick="eliminarTransaccion('${grupoId}','${t.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
     </div>
   ` : '';
 
@@ -1239,25 +1254,55 @@ async function abrirModalTransaccionGrupo(grupoId) {
 
   // Configurar checkboxes de participantes
   const containerParticipantes = document.getElementById("participantesTransaccion");
+  const inputMonto = document.getElementById("montoTransaccionGrupo");
+
+  function actualizarMontosPorPersona() {
+    const monto = Number(inputMonto.value) || 0;
+    const activos = containerParticipantes.querySelectorAll('.participante-row.active');
+    const montoPP = activos.length > 0 ? monto / activos.length : 0;
+    containerParticipantes.querySelectorAll('.participante-row').forEach(row => {
+      const montoEl = row.querySelector('.participante-row-monto');
+      if (montoEl) montoEl.textContent = row.classList.contains('active') ? `€${montoPP.toFixed(2)}` : '—';
+    });
+  }
 
   if (!grupo.miembros || grupo.miembros.length === 0) {
-    containerParticipantes.innerHTML = '<p style="color: var(--text-secondary);">No hay miembros en este grupo</p>';
+    containerParticipantes.innerHTML = '<p style="color: var(--on-surface-variant);">No hay miembros en este grupo</p>';
   } else {
-    containerParticipantes.innerHTML = `<div class="participantes-toggle-grid">${
+    containerParticipantes.innerHTML = `<div class="participantes-list">${
       grupo.miembros.map(m => {
         const iniciales = obtenerInicialesNombre(m.nombre);
         return `
-          <button type="button" class="participante-toggle active" data-id="${m.id}">
-            <div class="participante-toggle-avatar">${escapeHtml(iniciales)}<img src="${API_URL}/usuarios/${encodeURIComponent(m.id)}/foto" onerror="this.remove()" loading="lazy"></div>
-            <span class="participante-toggle-nombre">${escapeHtml(m.nombre.split(' ')[0])}</span>
-            <span class="participante-toggle-check"><i class="fas fa-check"></i></span>
+          <button type="button" class="participante-row active" data-id="${m.id}">
+            <div class="participante-row-left">
+              <div class="participante-row-avatar">
+                ${escapeHtml(iniciales)}
+                <img src="${API_URL}/usuarios/${encodeURIComponent(m.id)}/foto" onerror="this.remove()" loading="lazy">
+              </div>
+              <div class="participante-row-info">
+                <span class="participante-row-nombre">${escapeHtml(m.nombre)}</span>
+                <span class="participante-row-sub">Toca para excluir</span>
+              </div>
+            </div>
+            <div class="participante-row-right">
+              <span class="participante-row-monto">—</span>
+              <span class="participante-row-check"><i class="fas fa-check"></i></span>
+            </div>
           </button>`;
       }).join("")
     }</div>`;
 
-    containerParticipantes.querySelectorAll('.participante-toggle').forEach(btn => {
-      btn.addEventListener('click', () => btn.classList.toggle('active'));
+    containerParticipantes.querySelectorAll('.participante-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        const sub = btn.querySelector('.participante-row-sub');
+        if (sub) sub.textContent = btn.classList.contains('active') ? 'Toca para excluir' : 'Excluido';
+        actualizarMontosPorPersona();
+      });
     });
+
+    inputMonto.oninput = actualizarMontosPorPersona;
+    actualizarMontosPorPersona();
   }
 
 
@@ -1271,7 +1316,7 @@ async function abrirModalTransaccionGrupo(grupoId) {
     const fecha = document.getElementById("fechaTransaccion").value;
     const pagadorId = selectPagador.value;
 
-    const participantesSeleccionados = Array.from(containerParticipantes.querySelectorAll('.participante-toggle.active')).map(btn => btn.dataset.id);
+    const participantesSeleccionados = Array.from(containerParticipantes.querySelectorAll('.participante-row.active')).map(btn => btn.dataset.id);
 
     if (participantesSeleccionados.length === 0) {
       showPopup('Debes seleccionar al menos un participante', "warning");
@@ -1371,34 +1416,68 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
     selectPagador.innerHTML = `<option value="${transaccion.pagadorId}">${escapeHtml(transaccion.pagadorNombre)}</option>`;
   }
 
-  // Configurar checkboxes de participantes
+  // Configurar participantes con el mismo formato que nueva transacción
   const containerParticipantes = document.getElementById("editParticipantesTransaccion");
-  
-  if (!grupo.miembros || grupo.miembros.length === 0) {
-    containerParticipantes.innerHTML = '<p style="color: var(--text-secondary);">No hay miembros en este grupo</p>';
-  } else {
-    // IDs de participantes actuales
-    const participantesIds = (transaccion.participantes || []).map(p => String(p.id_usuario));
-    
-    containerParticipantes.innerHTML = grupo.miembros.map(m =>
-      `<label class="checkbox-label">
-        <input type="checkbox" name="participante" value="${m.id}" ${participantesIds.includes(String(m.id)) ? 'checked' : ''}>
-        <span>${escapeHtml(m.nombre)}</span>
-      </label>`
-    ).join("");
+  const inputMontoEdit = document.getElementById("editMontoTransaccion");
+
+  function actualizarMontosEdit() {
+    const monto = Number(inputMontoEdit.value) || 0;
+    const activos = containerParticipantes.querySelectorAll('.participante-row.active');
+    const montoPP = activos.length > 0 ? monto / activos.length : 0;
+    containerParticipantes.querySelectorAll('.participante-row').forEach(row => {
+      const montoEl = row.querySelector('.participante-row-monto');
+      if (montoEl) montoEl.textContent = row.classList.contains('active') ? `€${montoPP.toFixed(2)}` : '—';
+    });
   }
 
-  // Manejar submit
+  if (!grupo.miembros || grupo.miembros.length === 0) {
+    containerParticipantes.innerHTML = '<p style="color: var(--on-surface-variant);">No hay miembros en este grupo</p>';
+  } else {
+    const participantesIds = (transaccion.participantes || []).map(p => String(p.id_usuario));
+
+    containerParticipantes.innerHTML = `<div class="participantes-list">${
+      grupo.miembros.map(m => {
+        const iniciales = obtenerInicialesNombre(m.nombre);
+        const activo = participantesIds.includes(String(m.id));
+        return `
+          <button type="button" class="participante-row${activo ? ' active' : ''}" data-id="${m.id}">
+            <div class="participante-row-left">
+              <div class="participante-row-avatar">
+                ${escapeHtml(iniciales)}
+                <img src="${API_URL}/usuarios/${encodeURIComponent(m.id)}/foto" onerror="this.remove()" loading="lazy">
+              </div>
+              <div class="participante-row-info">
+                <span class="participante-row-nombre">${escapeHtml(m.nombre)}</span>
+                <span class="participante-row-sub">${activo ? 'Toca para excluir' : 'Excluido'}</span>
+              </div>
+            </div>
+            <div class="participante-row-right">
+              <span class="participante-row-monto">—</span>
+              <span class="participante-row-check"><i class="fas fa-check"></i></span>
+            </div>
+          </button>`;
+      }).join("")
+    }</div>`;
+
+    containerParticipantes.querySelectorAll('.participante-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        const sub = btn.querySelector('.participante-row-sub');
+        if (sub) sub.textContent = btn.classList.contains('active') ? 'Toca para excluir' : 'Excluido';
+        actualizarMontosEdit();
+      });
+    });
+
+    inputMontoEdit.oninput = actualizarMontosEdit;
+    actualizarMontosEdit();
+  }
+
+  // Manejar submit — usar onsubmit para sobrescribir sin clonar el form
   const form = document.getElementById("formEditarTransaccion");
-  
-  // Remover event listener anterior si existe
-  const newForm = form.cloneNode(true);
-  form.parentNode.replaceChild(newForm, form);
-  
-  newForm.onsubmit = async (e) => {
+
+  form.onsubmit = async (e) => {
     e.preventDefault();
 
-    // Leer IDs de los campos ocultos
     const transaccionIdActual = document.getElementById("editTransaccionId").value;
     const grupoIdActual = document.getElementById("editTransaccionGrupoId").value;
 
@@ -1408,8 +1487,8 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
     const pagadorId = document.getElementById("editPagadorTransaccion").value;
 
     const participantesSeleccionados = Array.from(
-      document.getElementById("editParticipantesTransaccion").querySelectorAll('input[type="checkbox"]:checked')
-    ).map(cb => cb.value);
+      document.getElementById("editParticipantesTransaccion").querySelectorAll('.participante-row.active')
+    ).map(btn => btn.dataset.id);
 
     if (participantesSeleccionados.length === 0) {
       showPopup('Debes seleccionar al menos un participante', "warning");
@@ -1564,21 +1643,36 @@ document.getElementById("formAddMiembros").addEventListener("submit", async (e) 
   }
 
   try {
+    const currentUser = authManager.getCurrentUser();
     const miembrosIds = miembrosSeleccionadosGrupoGlobal.map(m => Number(m.id));
     await fetch(`${API_URL}/grupos/${grupoIdActualAddMiembros}/miembros`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuarios_ids: miembrosIds })
+      body: JSON.stringify({ usuarios_ids: miembrosIds, id_invitador: currentUser.id })
     });
-    
+
     closeModal("modalAddMiembros");
-    await verDetalleGrupo(grupoIdActualAddMiembros);
     miembrosSeleccionadosGrupoGlobal = [];
-    showPopup("Miembros añadidos correctamente", "success");
+    showPopup("Invitaciones enviadas correctamente", "success");
   } catch (error) {
     showPopup("Error al añadir miembros: " + error.message, "error");
   }
 });
+
+async function eliminarTransaccion(grupoId, transaccionId) {
+  if (!await showConfirmPopup("¿Eliminar este gasto? Esta acción no se puede deshacer.", "Eliminar gasto", "danger")) return;
+  const currentUser = authManager.getCurrentUser();
+  try {
+    const res = await fetch(`${API_URL}/transacciones/${transaccionId}?id_usuario=${currentUser.id}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Error"); }
+    showPopup("Gasto eliminado correctamente", "success");
+    await verDetalleGrupo(grupoId);
+  } catch (err) {
+    showPopup("Error: " + err.message, "error");
+  }
+}
 
 async function marcarComoPagado(grupoId, transaccionId, usuarioId) {
   if (!await showConfirmPopup("¿Confirmar que este pago ha sido realizado?", "Confirmar pago", "primary")) {
@@ -1725,12 +1819,16 @@ async function loadTransacciones(filter = "all") {
 ========================= */
 function notifTipo(n) {
   if (n.tipo) return n.tipo;
-  // fallback por contenido para notifs antiguas sin columna tipo
   const msg = (n.mensaje || "").toLowerCase();
   if (msg.startsWith("[gasto]") || msg.includes("añadió")) return "gasto";
   if (msg.startsWith("[deuda]") || msg.includes("debes")) return "deuda";
   if (msg.startsWith("[actividad]") || msg.includes("añadido al grupo") || msg.includes("unió")) return "actividad";
   return "gasto";
+}
+
+function notifInvitacionId(n) {
+  const m = (n.mensaje || "").match(/\[invitacion:(\d+)\]/);
+  return m ? m[1] : null;
 }
 
 function notifFiltrada(n) {
@@ -1764,18 +1862,52 @@ async function loadNotificaciones() {
 
   const iconoTipo = tipo => ({ gasto: "fa-receipt", deuda: "fa-euro-sign", actividad: "fa-users" }[tipo] || "fa-bell");
 
-  container.innerHTML = visibles.map(n => `
-    <div class="notification-item ${n.leida ? 'leida' : 'no-leida'}" data-notif-id="${n.id}">
-      <div class="notif-icon-wrap"><i class="fas ${iconoTipo(notifTipo(n))}"></i></div>
-      <div class="notif-body">
-        <p>${escapeHtml(notifMensajeLimpio(n))}</p>
-        <small>${formatearFecha(n.fecha)}</small>
-      </div>
-      ${!n.leida ? `<button class="btn-small" onclick="marcarNotificacionLeida('${n.id}')">Marcar como leída</button>` : ''}
-    </div>
-  `).join("");
+  container.innerHTML = visibles.map(n => {
+    const invId = notifInvitacionId(n);
+    const botonesInvitacion = invId && !n.leida ? `
+      <div class="notif-inv-btns">
+        <button class="notif-inv-btn accept" onclick="responderInvitacion('${invId}','aceptar','${n.id}')">
+          <i class="fas fa-check"></i> Aceptar
+        </button>
+        <button class="notif-inv-btn decline" onclick="responderInvitacion('${invId}','rechazar','${n.id}')">
+          <i class="fas fa-times"></i> Rechazar
+        </button>
+      </div>` : '';
+    const btnLeida = !n.leida && !invId
+      ? `<button class="notif-read-btn" onclick="marcarNotificacionLeida('${n.id}')"><i class="fas fa-check"></i> Marcar como leída</button>`
+      : '';
+    return `
+      <div class="notification-item ${n.leida ? 'leida' : 'no-leida'}" data-notif-id="${n.id}">
+        <div class="notif-icon-wrap"><i class="fas ${iconoTipo(notifTipo(n))}"></i></div>
+        <div class="notif-body">
+          <p>${escapeHtml(notifMensajeLimpio(n))}</p>
+          <small>${formatearFecha(n.fecha)}</small>
+          ${botonesInvitacion}
+          ${btnLeida}
+        </div>
+      </div>`;
+  }).join("");
 }
 
+
+async function responderInvitacion(invId, accion, notifId) {
+  const currentUser = authManager.getCurrentUser();
+  try {
+    const res = await fetch(`${API_URL}/invitaciones/${invId}/${accion}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id_usuario: currentUser.id })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Error"); }
+    await notificationsManager.marcarComoLeida(notifId);
+    showPopup(accion === "aceptar" ? "Te has unido al grupo" : "Invitación rechazada", accion === "aceptar" ? "success" : "info");
+    await loadNotificaciones();
+    await updateNotificationBadge();
+    if (accion === "aceptar") await loadGrupos();
+  } catch (err) {
+    showPopup("Error: " + err.message, "error");
+  }
+}
 
 async function marcarNotificacionLeida(notifId) {
   await notificationsManager.marcarComoLeida(notifId);
@@ -1967,6 +2099,15 @@ function formatearFecha(fecha) {
 ========================= */
 let _statsChart = null;
 
+// Determina si una transacción está pagada desde el punto de vista del usuario actual:
+// - Si el usuario es el PAGADOR → pagada solo cuando todos los participantes han confirmado (completada)
+// - Si el usuario es PARTICIPANTE → pagada cuando él ha confirmado su parte
+function _txPagadaParaUsuario(tx, currentUser) {
+  if (tx.estado === 'completada') return true;
+  if (String(tx.pagadorId) === String(currentUser.id)) return false;
+  return tx.yoPague === true;
+}
+
 async function loadEstadisticas() {
   const currentUser = authManager.getCurrentUser();
   if (!currentUser) return;
@@ -2062,6 +2203,17 @@ async function loadEstadisticas() {
       meses.push({ year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase() });
     }
 
+    // Construir mapa id_transaccion -> monto_debe del usuario actual usando los detalles de grupo
+    const miPartePorTx = {};
+    for (const grupo of grupos) {
+      const detalle = gruposManager.obtenerGrupo(grupo.id);
+      if (!detalle) continue;
+      for (const tx of (detalle.transacciones || [])) {
+        const part = (tx.participantes || []).find(p => String(p.id_usuario) === String(currentUser.id));
+        if (part) miPartePorTx[String(tx.id)] = Number(part.monto_debe || 0);
+      }
+    }
+
     const gastosPorMes = meses.map(m => {
       return transacciones
         .filter(t => {
@@ -2075,11 +2227,15 @@ async function loadEstadisticas() {
       return transacciones
         .filter(t => {
           const f = new Date(t.fecha);
-          return f.getFullYear() === m.year && f.getMonth() === m.month && String(t.pagadorId) !== String(currentUser.id);
+          return f.getFullYear() === m.year && f.getMonth() === m.month;
         })
         .reduce((sum, t) => {
-          const participantes = t.participantes || 1;
-          return sum + Number(t.monto) / (typeof participantes === 'number' ? participantes : 1);
+          // Si soy el pagador, mi "parte" es lo que pagué de mi propio bolsillo (mi participación)
+          if (String(t.pagadorId) === String(currentUser.id)) {
+            return sum + (miPartePorTx[String(t.id)] || 0);
+          }
+          // Si soy participante, uso el monto_debe
+          return sum + (miPartePorTx[String(t.id)] || 0);
         }, 0);
     });
 
@@ -2157,9 +2313,11 @@ async function loadEstadisticas() {
       emptyEl.style.display = 'none';
       tbody.innerHTML = transacciones.map(t => {
         const esPagador = String(t.pagadorId) === String(currentUser.id);
-        const parte = esPagador ? Number(t.monto) : -(Number(t.monto));
+        const miParte = miPartePorTx[String(t.id)] ?? 0;
+        // Pagador: lo que puso de su bolsillo (su propia parte), positivo porque lo adelantó
+        // Participante: lo que debe pagar, negativo porque es deuda
         const parteClass = esPagador ? 'pos' : 'neg';
-        const parteLabel = esPagador ? `+${formatEur(Number(t.monto))}` : `-${formatEur(Number(t.monto))}`;
+        const parteLabel = esPagador ? `+${formatEur(miParte)}` : `-${formatEur(miParte)}`;
         const fecha = t.fecha ? new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
         return `
           <tr>
@@ -2173,7 +2331,7 @@ async function loadEstadisticas() {
             <td class="st-tx-concepto">${escapeHtml(t.concepto)}</td>
             <td class="st-tx-monto">${formatEur(Number(t.monto))}</td>
             <td class="st-tx-parte ${parteClass}">${parteLabel}</td>
-            <td><span class="st-tx-badge ${t.estado === 'completada' ? 'pagada' : 'pendiente'}">${t.estado === 'completada' ? window.t('stats_badge_paid') : window.t('stats_badge_pending')}</span></td>
+            <td><span class="st-tx-badge ${_txPagadaParaUsuario(t, currentUser) ? 'pagada' : 'pendiente'}">${_txPagadaParaUsuario(t, currentUser) ? window.t('stats_badge_paid') : window.t('stats_badge_pending')}</span></td>
           </tr>`;
       }).join('');
     }
