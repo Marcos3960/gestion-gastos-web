@@ -2,7 +2,11 @@
 
 
 
+// HTML estático original de #detalleGrupo (para restaurar al cambiar a grupo clásico)
+let _detalleGrupoOriginalHTML = null;
+
 document.addEventListener("DOMContentLoaded", () => {
+  _detalleGrupoOriginalHTML = document.getElementById('detalleGrupo').innerHTML;
   initApp();
 });
 
@@ -211,8 +215,10 @@ function setupAppListeners() {
       document.getElementById("stepTipoGrupo").style.display = "none";
       document.getElementById("formCrearGrupo").style.display = "";
       document.getElementById("modalCrearGrupoTitle").textContent =
-        tipo === "offline" ? "Nuevo Grupo Offline" : "Nuevo Grupo Clásico";
-      document.getElementById("seccionMiembrosClasico").style.display = tipo === "clasico" ? "" : "none";
+        tipo === "offline" ? "Nuevo Grupo Offline"
+        : tipo === "recurrente" ? "Nuevo Grupo Recurrente"
+        : "Nuevo Grupo Clásico";
+      document.getElementById("seccionMiembrosClasico").style.display = tipo !== "offline" ? "" : "none";
       document.getElementById("seccionMiembrosOffline").style.display = tipo === "offline" ? "" : "none";
     });
   });
@@ -420,9 +426,14 @@ function setupAppListeners() {
   });
 
 
-  // Back to grupos
-  document.getElementById("btnBackToGrupos")?.addEventListener("click", () => {
-    switchView("grupos");
+  // Back to grupos — delegado en document para sobrevivir reemplazos de innerHTML
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#btnBackToGrupos")) {
+      switchView("grupos");
+      document.querySelectorAll(".nav-item").forEach(b =>
+        b.classList.toggle("active", b.getAttribute("data-view") === "grupos")
+      );
+    }
   });
 }
 
@@ -733,6 +744,13 @@ async function loadGrupos() {
 let _tabActivo = "overview";
 
 async function verDetalleGrupo(grupoId) {
+  // Restaurar HTML estático si fue reemplazado por un grupo recurrente o presupuesto
+  const detalleEl = document.getElementById('detalleGrupo');
+  if (_detalleGrupoOriginalHTML && !detalleEl.querySelector('#detalleGrupoNombre')) {
+    detalleEl.innerHTML = _detalleGrupoOriginalHTML;
+  }
+  window._recDetRefresh = null;
+
   await gruposManager.cargarDetalleGrupo(grupoId);
   const grupo = gruposManager.obtenerGrupo(grupoId);
   const currentUser = authManager.getCurrentUser();
@@ -740,8 +758,14 @@ async function verDetalleGrupo(grupoId) {
 
   if (!grupo) return;
 
+  // Ruta especial para grupos recurrentes
+  if (grupo.tipo === 'recurrente') {
+    await renderGrupoRecurrente(grupoId);
+    switchView('detalleGrupo');
+    return;
+  }
 
-  const esAdmin = grupo.adminId === currentUser.id;
+  const esAdmin = String(grupo.adminId) === String(currentUser.id);
 
 
   document.getElementById("detalleGrupoNombre").textContent = grupo.nombre;
@@ -932,11 +956,12 @@ function renderTransaccionItem(t, grupoId, esAdmin, currentUser, divisa) {
 
   const esPagador = String(t.pagadorId || t.id_pagador) === String(currentUser.id);
   const puedeEliminar = esAdmin || esPagador;
+  const puedeEditar = esAdmin || esPagador;
 
-  const actionsHtml = (t.tieneImagen || esAdmin || puedeEliminar) ? `
+  const actionsHtml = (t.tieneImagen || puedeEditar || puedeEliminar) ? `
     <div class="tx-actions">
       ${t.tieneImagen ? `<button class="tx-btn-action" onclick="verImagenTransaccion('${t.id}')"><i class="fas fa-image"></i> Ver imagen</button>` : ''}
-      ${esAdmin ? `<button class="tx-btn-action edit" onclick="abrirModalEditarTransaccion('${grupoId}','${t.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
+      ${puedeEditar ? `<button class="tx-btn-action edit" onclick="abrirModalEditarTransaccion('${grupoId}','${t.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
       ${puedeEliminar ? `<button class="tx-btn-action danger" onclick="eliminarTransaccion('${grupoId}','${t.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
     </div>
   ` : '';
@@ -1297,8 +1322,7 @@ async function abrirModalTransaccionGrupo(grupoId) {
 
 
   const currentUser = authManager.getCurrentUser();
-  const esAdmin = grupo.adminId === currentUser.id;
-
+  const esAdmin = String(grupo.adminId) === String(currentUser.id);
 
   openModal("modalTransaccionGrupo");
 
@@ -1470,7 +1494,7 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
   }
 
   const currentUser = authManager.getCurrentUser();
-  const esAdmin = grupo.adminId === currentUser.id;
+  const esAdmin = String(grupo.adminId) === String(currentUser.id);
 
   openModal("modalEditarTransaccion");
 
@@ -1602,8 +1626,8 @@ async function abrirModalEditarTransaccion(grupoId, transaccionId) {
         fecha || null
       );
       closeModal("modalEditarTransaccion");
-      await verDetalleGrupo(grupoIdActual);
       showPopup('Gasto actualizado correctamente', "success");
+      if (window._recDetRefresh) { await window._recDetRefresh(); } else { await verDetalleGrupo(grupoIdActual); }
     } catch (error) {
       showPopup('Error al actualizar: ' + error.message, "error");
     }
@@ -1823,7 +1847,7 @@ async function eliminarTransaccion(grupoId, transaccionId) {
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Error"); }
     showPopup("Gasto eliminado correctamente", "success");
-    await verDetalleGrupo(grupoId);
+    if (window._recDetRefresh) { await window._recDetRefresh(); } else { await verDetalleGrupo(grupoId); }
   } catch (err) {
     showPopup("Error: " + err.message, "error");
   }
@@ -1836,7 +1860,7 @@ async function marcarComoPagado(grupoId, transaccionId, usuarioId) {
 
   try {
     await transaccionesManager.marcarComoPagada(grupoId, transaccionId, usuarioId);
-    await verDetalleGrupo(grupoId);
+    if (window._recDetRefresh) { await window._recDetRefresh(); } else { await verDetalleGrupo(grupoId); }
     showPopup("Pago marcado como realizado", "success");
   } catch (error) {
     showPopup("Error al marcar como pagado: " + error.message, "error");
@@ -1927,6 +1951,692 @@ async function eliminarMiembroGrupo(grupoId, miembroId) {
     showPopup(error.message, "error");
   }
 }
+
+/* =========================
+   GRUPO RECURRENTE
+========================= */
+
+// Variable global para el grupoId activo en recurrente
+let _recGrupoId = null;
+
+function _periodoActivoLabel(periodo) {
+  const hoy = new Date();
+  const y = hoy.getFullYear();
+  const m = hoy.getMonth();
+  if (periodo === 'mensual') {
+    return hoy.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+      .replace(/^\w/, c => c.toUpperCase());
+  }
+  if (periodo === 'trimestral') {
+    const q = Math.floor(m / 3) + 1;
+    return `T${q} ${y}`;
+  }
+  if (periodo === 'semestral') {
+    return (m < 6 ? '1er' : '2o') + ` semestre ${y}`;
+  }
+  return `Año ${y}`;
+}
+
+function _statusBudget(pct) {
+  if (pct >= 100) return { color: '#f87171', text: 'Pago completado' };
+  if (pct >= 90)  return { color: '#f87171', text: `Límite crítico alcanzado (${pct}%)` };
+  if (pct >= 75)  return { color: '#f97316', text: `Alerta de presupuesto alcanzado (${pct}%)` };
+  return { color: '#4ade80', text: 'En camino al objetivo mensual' };
+}
+
+async function renderGrupoRecurrente(grupoId) {
+  _recGrupoId = grupoId;
+
+  const grupo = gruposManager.obtenerGrupo(grupoId);
+  const currentUser = authManager.getCurrentUser();
+  const esAdmin = String(grupo.adminId) === String(currentUser.id);
+
+  // Obtener presupuestos con gasto_actual
+  let presupuestos = [];
+  try {
+    const resp = await fetch(`${API_URL}/grupos/${grupoId}/presupuestos`);
+    presupuestos = await resp.json();
+    if (!Array.isArray(presupuestos)) presupuestos = [];
+  } catch (e) {
+    console.error('Error cargando presupuestos:', e);
+  }
+
+  // Calcular totales
+  const totalLimite = presupuestos.reduce((s, p) => s + Number(p.importe), 0);
+  const totalGasto  = presupuestos.reduce((s, p) => s + Number(p.gasto_actual), 0);
+  const pctGlobal   = totalLimite > 0 ? Math.min(100, Math.round((totalGasto / totalLimite) * 100)) : 0;
+  const saldoRestante = Math.max(0, totalLimite - totalGasto);
+
+  // Badge período activo (usa el primer presupuesto o mensual por defecto)
+  const periodoLabel = _periodoActivoLabel(presupuestos[0]?.periodo || 'mensual');
+  const diasRestantes = presupuestos[0]?.dias_restantes ?? 0;
+
+  // Color del anillo global
+  const { color: colorGlobal, text: statusGlobal } = _statusBudget(pctGlobal);
+  const gradiente = `conic-gradient(${colorGlobal} ${pctGlobal * 3.6}deg, var(--surface-high) 0deg)`;
+
+  // Generar tarjetas
+  const cardsHtml = presupuestos.map(p => {
+    const pct = p.importe > 0 ? Math.min(100, Math.round((p.gasto_actual / p.importe) * 100)) : 0;
+    const { color, text: statusTxt } = _statusBudget(pct);
+    return `
+      <div class="rec-budget-card" onclick="renderDetallePresupuesto(${p.id_presupuesto}, '${grupoId}')" style="cursor:pointer">
+        <div class="rec-card-header">
+          <div class="rec-card-icon-wrap"><i class="fas ${escapeHtml(p.icono || 'fa-receipt')}"></i></div>
+          <div style="flex:1; margin-left:0.75rem">
+            <div class="rec-card-name">${escapeHtml(p.nombre)}</div>
+            <div class="rec-card-dias">${p.dias_restantes} días restantes</div>
+          </div>
+          <button class="rec-card-menu-btn" data-menu="${p.id_presupuesto}" onclick="event.stopPropagation()">
+            <i class="fas fa-ellipsis-v"></i>
+          </button>
+          <div class="rec-card-menu" id="menu-${p.id_presupuesto}">
+            <button class="rec-card-menu-item" onclick="abrirEditarPresupuesto(${p.id_presupuesto})">
+              <i class="fas fa-edit"></i> Editar
+            </button>
+            <button class="rec-card-menu-item danger" onclick="eliminarPresupuesto(${p.id_presupuesto})">
+              <i class="fas fa-trash"></i> Eliminar
+            </button>
+          </div>
+        </div>
+        <div class="rec-card-amounts">
+          <strong>€${Number(p.gasto_actual).toFixed(2)}</strong> / €${Number(p.importe).toFixed(2)}
+        </div>
+        <div class="rec-progress-bar-wrap">
+          <div class="rec-progress-bar" style="width:${pct}%; background:${color}"></div>
+        </div>
+        <div class="rec-card-status" style="color:${color}">${escapeHtml(statusTxt)}</div>
+      </div>`;
+  }).join('');
+
+  // Tarjeta añadir
+  const addCard = `
+    <button class="rec-add-card" onclick="abrirCrearPresupuesto()">
+      <i class="fas fa-plus"></i>
+      <span>Añadir Categoría</span>
+    </button>`;
+
+  // Construir HTML completo del detalleGrupo
+  const container = document.getElementById('detalleGrupo');
+  container.innerHTML = `
+    <!-- Cabecera grupo recurrente -->
+    <div class="grupo-detalle-hero">
+      <div class="grupo-detalle-hero-top">
+        <button class="btn-back" onclick="if(window._recMenuCloseHandler){document.removeEventListener('click',window._recMenuCloseHandler);window._recMenuCloseHandler=null;}switchView('grupos');document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.getAttribute('data-view')==='grupos'))">
+          <i class="fas fa-arrow-left"></i> Volver
+        </button>
+        <span class="grupo-detalle-overline">GRUPO RECURRENTE</span>
+      </div>
+      <div class="grupo-detalle-title-row">
+        <div class="grupo-detalle-title-left">
+          <h2>${escapeHtml(grupo.nombre)}</h2>
+          <span class="badge-divisa">${escapeHtml(grupo.divisa)}</span>
+          <span class="badge-periodo">${escapeHtml(periodoLabel)}</span>
+        </div>
+      </div>
+      <p class="grupo-detalle-desc">${escapeHtml(grupo.descripcion || 'Sin descripción')}</p>
+    </div>
+
+    <!-- Barra de acciones (igual que grupos clásicos) -->
+    <div class="grupo-actions-bar">
+      <div class="grupo-actions-left">
+        ${esAdmin ? `
+          <button class="btn-secondary" onclick="abrirMiembrosGrupo('${grupoId}')">
+            <i class="fas fa-user-plus"></i> Añadir miembros
+          </button>
+          <button class="btn-secondary" onclick="abrirModalEditarGrupo('${grupoId}')">
+            <i class="fas fa-edit"></i> Editar grupo
+          </button>` : ''}
+      </div>
+      <div class="grupo-actions-right">
+        ${esAdmin ? `
+          <button class="btn-danger" onclick="eliminarGrupo('${grupoId}')">
+            <i class="fas fa-trash"></i> Eliminar grupo
+          </button>` : `
+          <button class="btn-danger" onclick="salirDelGrupo('${grupoId}')">
+            <i class="fas fa-sign-out-alt"></i> Salir del grupo
+          </button>`}
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="rec-tabs">
+      <button class="rec-tab active" id="recTabPresupuestos" onclick="recSwitchTab('presupuestos', '${grupoId}')">
+        <i class="fas fa-wallet"></i> Presupuestos
+      </button>
+      <button class="rec-tab" id="recTabEstadisticas" onclick="recSwitchTab('estadisticas', '${grupoId}')">
+        <i class="fas fa-chart-bar"></i> Estadísticas
+      </button>
+    </div>
+
+    <!-- Panel presupuestos -->
+    <div class="rec-layout" id="recPanelPresupuestos">
+          <div class="rec-top-row">
+            <div class="rec-global-card">
+              <div class="rec-ring" style="background: conic-gradient(${colorGlobal} ${pctGlobal * 3.6}deg, var(--surface-high) 0deg)">
+                <div class="rec-ring-label" style="background:var(--surface-container); width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-direction:column">
+                  <strong>${pctGlobal}%</strong>
+                  <span>consumido</span>
+                </div>
+              </div>
+              <div class="rec-global-info">
+                <div class="rec-global-title">PRESUPUESTO GLOBAL</div>
+                <div class="rec-global-values">
+                  <div class="rec-global-val">
+                    <span class="rec-global-val-label">TOTAL LÍMITE</span>
+                    <span class="rec-global-val-num">€${totalLimite.toFixed(2)}</span>
+                  </div>
+                  <div class="rec-global-val">
+                    <span class="rec-global-val-label">TOTAL GASTADO</span>
+                    <span class="rec-global-val-num">€${totalGasto.toFixed(2)}</span>
+                  </div>
+                  <div class="rec-global-val">
+                    <span class="rec-global-val-label">SALDO RESTANTE</span>
+                    <span class="rec-global-val-num" style="color:${colorGlobal}">€${saldoRestante.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div class="rec-global-status">${escapeHtml(statusGlobal)}</div>
+                <div class="rec-global-dias"><i class="fas fa-clock"></i> ${diasRestantes} días restantes en el ciclo</div>
+                <button class="btn-rec-nuevo" onclick="abrirCrearPresupuesto()" style="margin-top:0.75rem">
+                  <i class="fas fa-plus"></i> Nuevo Presupuesto
+                </button>
+              </div>
+            </div>
+            <div class="rec-top-right">
+              <div class="rec-miembros-card">
+                <div class="rec-miembros-title">MIEMBROS</div>
+                <div class="rec-miembros-list">
+                  ${grupo.miembros.map(m => `
+                    <div class="rec-miembro-row">
+                      <div class="miembro-avatar" style="width:28px;height:28px;font-size:0.7rem" aria-hidden="true">
+                        <span class="miembro-avatar-fallback">${escapeHtml(obtenerInicialesNombre(m.nombre))}</span>
+                        <img src="${API_URL}/usuarios/${encodeURIComponent(m.id)}/foto" alt="" loading="lazy" onerror="this.remove()">
+                      </div>
+                      <span class="rec-miembro-nombre">${escapeHtml(m.nombre)}</span>
+                      ${m.rol === 'admin' ? '<span class="badge-admin">Admin</span>' : ''}
+                      ${m.offline ? '<span class="badge-offline">Offline</span>' : ''}
+                    </div>`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rec-cards-grid">
+            ${cardsHtml}
+            ${addCard}
+          </div>
+        </div>
+
+        <!-- Panel estadísticas (oculto por defecto) -->
+        <div id="recPanelEstadisticas" style="display:none"></div>
+  `;
+
+  // Menús de 3 puntos en tarjetas
+  container.querySelectorAll('.rec-card-menu-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = btn.dataset.menu;
+      const menu = document.getElementById(`menu-${id}`);
+      container.querySelectorAll('.rec-card-menu.open').forEach(m => {
+        if (m !== menu) m.classList.remove('open');
+      });
+      menu?.classList.toggle('open');
+    });
+  });
+
+  // Cerrar menús al hacer click fuera — eliminar listener previo si existe
+  if (window._recMenuCloseHandler) {
+    document.removeEventListener('click', window._recMenuCloseHandler);
+  }
+  window._recMenuCloseHandler = (e) => {
+    if (!e.target.closest('.rec-card-menu') && !e.target.closest('.rec-card-menu-btn')) {
+      document.querySelectorAll('.rec-card-menu.open').forEach(m => m.classList.remove('open'));
+    }
+  };
+  document.addEventListener('click', window._recMenuCloseHandler);
+}
+
+// Switch de pestañas en grupo recurrente
+async function recSwitchTab(tab, grupoId) {
+  document.getElementById('recTabPresupuestos')?.classList.toggle('active', tab === 'presupuestos');
+  document.getElementById('recTabEstadisticas')?.classList.toggle('active', tab === 'estadisticas');
+  document.getElementById('recPanelPresupuestos').style.display = tab === 'presupuestos' ? '' : 'none';
+  const panelEst = document.getElementById('recPanelEstadisticas');
+  panelEst.style.display = tab === 'estadisticas' ? '' : 'none';
+  if (tab === 'estadisticas' && panelEst.innerHTML === '') {
+    await renderEstadisticasRecurrente(grupoId);
+  }
+}
+
+// Render vista estadísticas recurrente
+async function renderEstadisticasRecurrente(grupoId) {
+  const panel = document.getElementById('recPanelEstadisticas');
+  panel.innerHTML = `<div class="rec-stats-loading"><i class="fas fa-spinner fa-spin"></i> Cargando estadísticas...</div>`;
+
+  let data;
+  try {
+    const resp = await fetch(`${API_URL}/grupos/${grupoId}/estadisticas-recurrente`);
+    if (!resp.ok) throw new Error();
+    data = await resp.json();
+  } catch {
+    panel.innerHTML = `<div class="rec-stats-loading">No se pudieron cargar las estadísticas.</div>`;
+    return;
+  }
+
+  const { periodos, breakdown, stats } = data;
+
+  // --- Gráfico de barras (SVG) ---
+  const SVG_W = 500, SVG_H = 200, HALF = 80, MID_Y = 90, BAR_W = 32, LABEL_Y = SVG_H - 8;
+  const maxDesviacion = Math.max(...periodos.map(p => Math.abs(p.presupuestado - p.gastado)), 1);
+  const n = periodos.length;
+  const slotW = n > 0 ? SVG_W / n : SVG_W;
+
+  const svgBars = periodos.map((p, i) => {
+    const cx = slotW * i + slotW / 2;
+    const desviacion = p.presupuestado - p.gastado;
+    const barH = Math.max(4, Math.round((Math.abs(desviacion) / maxDesviacion) * HALF));
+    const ahorro = desviacion >= 0;
+    const rectX = cx - BAR_W / 2;
+    const rectY = ahorro ? MID_Y - barH : MID_Y;
+    const color = ahorro ? '#34d399' : '#f87171';
+    const rx = 4;
+    const labelColor = p.esActual ? '#4f87f5' : '#888';
+    const fontWeight = p.esActual ? 'bold' : 'normal';
+    return `
+      <rect x="${rectX}" y="${rectY}" width="${BAR_W}" height="${barH}" fill="${color}" rx="${rx}" style="cursor:pointer">
+        <title>${ahorro ? `Restante: €${desviacion.toFixed(2)} de €${p.presupuestado.toFixed(2)}` : `Excedido: €${Math.abs(desviacion).toFixed(2)} sobre €${p.presupuestado.toFixed(2)}`}</title>
+      </rect>
+      <text x="${cx}" y="${LABEL_Y}" text-anchor="middle" font-size="11" fill="${labelColor}" font-weight="${fontWeight}" font-family="sans-serif">${escapeHtml(p.label)}</text>`;
+  }).join('');
+
+  const barsHtml = n === 0
+    ? `<p style="color:var(--on-surface-muted);font-size:0.85rem;text-align:center;padding:2rem">Sin actividad registrada aún</p>`
+    : `<svg viewBox="0 0 ${SVG_W} ${SVG_H}" width="100%" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg">
+        <!-- Línea central = presupuesto -->
+        <line x1="0" y1="${MID_Y}" x2="${SVG_W}" y2="${MID_Y}" stroke="#666" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="4" y="${MID_Y - 5}" font-size="10" fill="#666" font-family="sans-serif">€${periodos[0]?.presupuestado ?? 0}</text>
+        ${svgBars}
+      </svg>`;
+
+  // --- Historial de períodos ---
+  const cerrados = periodos.filter(p => !p.esActual).slice(-5).reverse();
+  const histHtml = cerrados.map(p => {
+    const excedido = p.surplus < 0;
+    const color = excedido ? '#f87171' : '#34d399';
+    const barPct = excedido ? 100 : Math.min(100, Math.round((p.surplus / p.presupuestado) * 100));
+    const signo = excedido ? '-' : '+';
+    return `
+      <div class="rec-hist-row">
+        <div class="rec-hist-row-top">
+          <span class="rec-hist-label">${escapeHtml(p.label)}</span>
+          <span style="color:${color};font-weight:700;font-size:0.9rem;">${signo}€${Math.abs(p.surplus).toFixed(2)}</span>
+        </div>
+        <div style="width:100%;height:6px;background:#2a2d35;border-radius:3px;margin-top:2px;">
+          <div style="width:${barPct}%;height:100%;background:${color};border-radius:3px;transition:width 0.4s;"></div>
+        </div>
+      </div>`;
+  }).join('') || `<p style="color:#888; font-size:0.85rem; text-align:center; padding:1rem">Sin períodos cerrados aún</p>`;
+
+  // --- Donut breakdown (por importe de presupuesto, no por gasto) ---
+  const PALETTE = ['#4f87f5','#34d399','#f59e0b','#f87171','#a78bfa','#fb923c'];
+  const totalImporte = breakdown.reduce((s, b) => s + b.importe, 0) || 1;
+  let conicParts = '', startDeg = 0;
+  breakdown.forEach((b, i) => {
+    const pct = totalImporte > 0 ? b.importe / totalImporte * 100 : 0;
+    const deg = Math.round(pct * 3.6);
+    conicParts += `${PALETTE[i % PALETTE.length]} ${startDeg}deg ${startDeg + deg}deg, `;
+    startDeg += deg;
+  });
+  conicParts += `var(--surface-high) ${startDeg}deg`;
+  const donutLegend = breakdown.map((b, i) => {
+    const pct = Math.round(b.importe / totalImporte * 100);
+    return `
+    <div class="rec-donut-legend-item">
+      <span class="rec-donut-dot" style="background:${PALETTE[i % PALETTE.length]}"></span>
+      <span class="rec-donut-legend-name">${escapeHtml(b.nombre)}</span>
+      <span class="rec-donut-legend-pct">${pct}% · €${b.importe.toFixed(0)}</span>
+    </div>`;
+  }).join('');
+
+  // --- Recomendación automática ---
+  const peorCat = breakdown.reduce((w, b) => (!w || b.gastado / (b.importe || 1) > w.gastado / (w.importe || 1)) ? b : w, null);
+  const recomendacion = peorCat && peorCat.importe > 0 && (peorCat.gastado / peorCat.importe) > 0.8
+    ? `Tu categoría <strong>${escapeHtml(peorCat.nombre)}</strong> ha consumido el ${Math.round((peorCat.gastado / peorCat.importe) * 100)}% del presupuesto. Considera ajustar el límite o reducir gastos en esta categoría.`
+    : `Tus presupuestos están bien distribuidos. Sigue así para mantener un buen control financiero.`;
+
+  const periodoLabel = { mensual: 'Mensual', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' }[stats.periodo] || stats.periodo;
+
+  panel.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Fila superior: barras + donut -->
+      <div style="display:flex;gap:1rem;align-items:stretch;">
+
+        <!-- Gráfico barras -->
+        <div class="rec-stats-card" style="flex:1;min-width:0;width:50%;display:flex;flex-direction:column;">
+          <div class="rec-stats-card-header">
+            <span class="rec-stats-card-title">Budget Health Chart</span>
+            <div class="rec-bar-legend">
+              <span class="rec-bar-legend-dot surplus"></span> Dentro del presupuesto
+              <span class="rec-bar-legend-dot over" style="margin-left:1rem"></span> Excedido
+            </div>
+          </div>
+          <div class="rec-bar-chart">${barsHtml}</div>
+        </div>
+
+        <!-- Donut -->
+        <div class="rec-stats-card" style="flex:1;min-width:0;width:50%;display:flex;flex-direction:column;justify-content:center;">
+          <div class="rec-stats-card-title" style="margin-bottom:1rem">Distribución del presupuesto</div>
+          <div class="rec-donut-row">
+            <div class="rec-donut" style="background: conic-gradient(${conicParts})">
+              <div class="rec-donut-inner">
+                <div class="rec-donut-total-label">TOTAL</div>
+                <div class="rec-donut-total-val">€${totalImporte >= 1000 ? (totalImporte / 1000).toFixed(1) + 'k' : totalImporte.toFixed(0)}</div>
+              </div>
+            </div>
+            <div class="rec-donut-legend">${donutLegend}</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Historial debajo -->
+      <div class="rec-stats-card">
+        <div class="rec-stats-card-title">Historial de Períodos</div>
+        <div class="rec-stats-card-sub">Últimos ciclos completados</div>
+        <div class="rec-hist-list">${histHtml}</div>
+      </div>
+
+    </div>
+  `;
+}
+
+// Vista de detalle de un presupuesto
+async function renderDetallePresupuesto(idPresupuesto, grupoId) {
+  let data;
+  try {
+    const resp = await fetch(`${API_URL}/presupuestos/${idPresupuesto}/transacciones`);
+    if (!resp.ok) throw new Error('Error al cargar');
+    data = await resp.json();
+  } catch (e) {
+    showPopup('No se pudo cargar el detalle', 'error');
+    return;
+  }
+
+  const p = data.presupuesto;
+  const txs = data.transacciones;
+  const pct = p.importe > 0 ? Math.min(100, Math.round((p.gasto_actual / p.importe) * 100)) : 0;
+  const restante = Math.max(0, Number(p.importe) - Number(p.gasto_actual));
+  const { color } = _statusBudget(pct);
+  const currentUser = authManager.getCurrentUser();
+  const grupo = gruposManager.obtenerGrupo(grupoId);
+  const esAdmin = String(grupo?.adminId) === String(currentUser.id);
+  const divisa = grupo?.divisa || 'EUR';
+
+  // Etiqueta del período
+  const periodoDate = new Date(data.periodo.inicio + 'T12:00:00');
+  const periodoLabel = periodoDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  const periodoCapitalizado = periodoLabel.charAt(0).toUpperCase() + periodoLabel.slice(1);
+
+  // Normalizar transacciones al formato que espera renderTransaccionItem
+  const txsNorm = txs.map(t => ({
+    id: String(t.id_transaccion),
+    grupoId: String(t.id_grupo || grupoId),
+    tipo: t.tipo,
+    estado: t.estado,
+    concepto: t.concepto,
+    monto: Number(t.monto),
+    pagadorId: String(t.id_pagador || ''),
+    pagadorNombre: t.nombre_pagador,
+    fecha: t.fecha_transaccion || t.fecha_creacion,
+    tieneImagen: !!t.tiene_imagen,
+    participantes: (t.participantes || []).map(p => ({
+      id_usuario: p.id_usuario,
+      monto_debe: Number(p.monto_debe),
+      pagado: !!p.pagado,
+      usuario_nombre: p.usuario_nombre
+    }))
+  }));
+
+  const emptyHtml = txsNorm.length === 0 ? `
+    <div class="rec-det-empty">
+      <i class="fas fa-receipt" style="font-size:2.5rem; opacity:0.3; margin-bottom:0.75rem"></i>
+      <p>Sin gastos en este período</p>
+    </div>` : '';
+
+  const container = document.getElementById('detalleGrupo');
+  container.innerHTML = `
+    <div class="rec-det-header">
+      <button class="btn-back" id="btnBackFromDet">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <div class="rec-det-header-info">
+        <h2>${escapeHtml(p.nombre)}</h2>
+        <span class="rec-det-periodo">${periodoCapitalizado}</span>
+      </div>
+    </div>
+
+    <div class="rec-det-top-grid">
+      <div class="rec-det-card rec-det-card-main">
+        <div class="rec-det-card-label">TOTAL RESTANTE</div>
+        <div class="rec-det-card-value">€${restante.toFixed(2)}</div>
+        <div class="rec-det-budget-line">
+          <span>Presupuesto: €${Number(p.importe).toFixed(2)}</span>
+          <span style="color:${color}">${pct}% consumido</span>
+        </div>
+        <div class="rec-progress-bar-wrap">
+          <div class="rec-progress-bar" style="width:${pct}%; background:${color}"></div>
+        </div>
+      </div>
+
+      <div class="rec-det-right-col">
+        <div class="rec-det-card rec-det-card-stat">
+          <div class="rec-det-stat-icon"><i class="fas fa-chart-line" style="color:var(--accent-green)"></i></div>
+          <div>
+            <div class="rec-det-card-label">Gasto Diario Promedio</div>
+            <div class="rec-det-card-value">€${Number(data.gasto_diario_promedio).toFixed(2)}</div>
+          </div>
+        </div>
+        <button class="rec-det-btn-add" onclick="abrirModalGastoRecurrente('${grupoId}', ${idPresupuesto})">
+          <i class="fas fa-plus-circle"></i> Añadir Gasto
+        </button>
+      </div>
+    </div>
+
+    <div class="rec-det-actividad-title">Actividad Reciente</div>
+
+    <div class="tx-list rec-det-tx-list" id="recDetTxList">
+      ${txsNorm.map(t => renderTransaccionItem(t, grupoId, esAdmin, currentUser, divisa)).join('')}
+      ${emptyHtml}
+    </div>
+  `;
+
+  container.scrollTop = 0;
+
+  window._recDetRefresh = () => renderDetallePresupuesto(idPresupuesto, grupoId);
+
+  document.getElementById('btnBackFromDet').onclick = async () => {
+    window._recDetRefresh = null;
+    await renderGrupoRecurrente(grupoId);
+  };
+}
+
+// Abrir modal para crear presupuesto
+function abrirCrearPresupuesto() {
+  document.getElementById('modalCrearPresupuestoTitle').textContent = 'Nuevo Presupuesto';
+  document.getElementById('editPresupuestoId').value = '';
+  document.getElementById('presupuestoNombre').value = '';
+  document.getElementById('presupuestoImporte').value = '';
+  document.getElementById('presupuestoPeriodo').value = 'mensual';
+  document.getElementById('presupuestoFechaInicio').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('presupuestoIcono').value = 'fa-utensils';
+  document.querySelectorAll('.rec-icon-option').forEach(b => b.classList.remove('active'));
+  document.querySelector('.rec-icon-option[data-icon="fa-utensils"]')?.classList.add('active');
+  document.getElementById('btnSubmitPresupuesto').innerHTML = '<i class="fas fa-plus"></i> Guardar';
+  openModal('modalCrearPresupuesto');
+}
+
+// Abrir modal para editar presupuesto
+async function abrirEditarPresupuesto(id) {
+  // Cerrar menús abiertos
+  document.querySelectorAll('.rec-card-menu.open').forEach(m => m.classList.remove('open'));
+
+  // Obtener datos actuales desde el DOM (o re-fetch)
+  let p = null;
+  try {
+    const resp = await fetch(`${API_URL}/grupos/${_recGrupoId}/presupuestos`);
+    const lista = await resp.json();
+    p = lista.find(x => x.id_presupuesto === id);
+  } catch (e) { console.error(e); }
+
+  if (!p) { showPopup('No se pudo cargar el presupuesto', 'error'); return; }
+
+  document.getElementById('modalCrearPresupuestoTitle').textContent = 'Editar Presupuesto';
+  document.getElementById('editPresupuestoId').value = id;
+  document.getElementById('presupuestoNombre').value = p.nombre;
+  document.getElementById('presupuestoImporte').value = Number(p.importe).toFixed(2);
+  document.getElementById('presupuestoPeriodo').value = p.periodo;
+  document.getElementById('presupuestoFechaInicio').value = p.fecha_inicio ? p.fecha_inicio.slice(0, 10) : '';
+  document.getElementById('presupuestoIcono').value = p.icono || 'fa-receipt';
+  document.querySelectorAll('.rec-icon-option').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.rec-icon-option[data-icon="${p.icono}"]`)?.classList.add('active');
+  document.getElementById('btnSubmitPresupuesto').innerHTML = '<i class="fas fa-save"></i> Guardar cambios';
+  openModal('modalCrearPresupuesto');
+}
+
+// Eliminar presupuesto
+async function eliminarPresupuesto(id) {
+  document.querySelectorAll('.rec-card-menu.open').forEach(m => m.classList.remove('open'));
+  if (!await showConfirmPopup('¿Eliminar este presupuesto? Los gastos asociados no se borrarán.', 'Eliminar', 'danger')) return;
+  try {
+    const resp = await fetch(`${API_URL}/presupuestos/${id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('Error al eliminar');
+    showPopup('Presupuesto eliminado', 'success');
+    await renderGrupoRecurrente(_recGrupoId);
+  } catch (e) {
+    showPopup('Error: ' + e.message, 'error');
+  }
+}
+
+// Abrir modal de nuevo gasto para grupo recurrente (añade select de presupuesto)
+async function abrirModalGastoRecurrente(grupoId, idPresupuesto = null) {
+  await abrirModalTransaccionGrupo(grupoId);
+
+  const form = document.getElementById('formTransaccionGrupo');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const selectPagador = document.getElementById('pagadorTransaccion');
+    const containerParticipantes = document.getElementById('participantesTransaccion');
+    const concepto = document.getElementById('conceptoTransaccionGrupo').value;
+    const monto = document.getElementById('montoTransaccionGrupo').value;
+    const fecha = document.getElementById('fechaTransaccion').value;
+    const pagadorId = selectPagador.value;
+
+    const participantesSeleccionados = Array.from(
+      containerParticipantes.querySelectorAll('.participante-row.active')
+    ).map(btn => btn.dataset.id);
+
+    if (participantesSeleccionados.length === 0) {
+      showPopup('Debes seleccionar al menos un participante', 'warning');
+      return;
+    }
+
+    const montoPorPersona = Number(monto) / participantesSeleccionados.length;
+    const participantes = participantesSeleccionados.map(id => ({
+      id_usuario: Number(id),
+      monto_debe: montoPorPersona,
+      pagado: String(id) === String(pagadorId)
+    }));
+
+    try {
+      const body = {
+        id_grupo: grupoId,
+        concepto,
+        monto: Number(monto),
+        tipo: 'gasto',
+        participantes,
+        id_pagador: pagadorId,
+        id_presupuesto: idPresupuesto ? Number(idPresupuesto) : null
+      };
+      if (fecha) body.fecha_transaccion = fecha;
+
+      const resp = await fetch(`${API_URL}/transacciones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || 'Error'); }
+      const resultado = await resp.json();
+
+      const imagenInput = document.getElementById('imagenTransaccion');
+      if (imagenInput?.files?.length > 0) {
+        const fd = new FormData();
+        fd.append('imagen', imagenInput.files[0]);
+        await fetch(`${API_URL}/transacciones/${resultado.id_transaccion}/imagen`, { method: 'POST', body: fd });
+      }
+
+      closeModal('modalTransaccionGrupo');
+      form.reset();
+      showPopup('Gasto añadido correctamente', 'success');
+      if (idPresupuesto) {
+        await renderDetallePresupuesto(idPresupuesto, grupoId);
+      } else {
+        await renderGrupoRecurrente(grupoId);
+      }
+    } catch (err) {
+      showPopup(err.message, 'error');
+    }
+  };
+}
+
+// Setup del formulario de crear/editar presupuesto (se ejecuta al cargar el DOM)
+(function setupPresupuestoModal() {
+  // Icon picker
+  document.getElementById('iconPickerGrid')?.addEventListener('click', e => {
+    const btn = e.target.closest('.rec-icon-option');
+    if (!btn) return;
+    document.querySelectorAll('.rec-icon-option').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('presupuestoIcono').value = btn.dataset.icon;
+  });
+
+  // Submit
+  document.getElementById('formCrearPresupuesto')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const idEditar = document.getElementById('editPresupuestoId').value;
+    const payload = {
+      nombre: document.getElementById('presupuestoNombre').value.trim(),
+      importe: document.getElementById('presupuestoImporte').value,
+      periodo: document.getElementById('presupuestoPeriodo').value,
+      fecha_inicio: document.getElementById('presupuestoFechaInicio').value,
+      icono: document.getElementById('presupuestoIcono').value
+    };
+
+    try {
+      if (idEditar) {
+        const resp = await fetch(`${API_URL}/presupuestos/${idEditar}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || 'Error'); }
+        showPopup('Presupuesto actualizado', 'success');
+      } else {
+        const resp = await fetch(`${API_URL}/grupos/${_recGrupoId}/presupuestos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || 'Error'); }
+        showPopup('Presupuesto creado', 'success');
+      }
+      closeModal('modalCrearPresupuesto');
+      await renderGrupoRecurrente(_recGrupoId);
+    } catch (err) {
+      showPopup('Error: ' + err.message, 'error');
+    }
+  });
+})();
 
 /* =========================
    USUARIOS SELECT

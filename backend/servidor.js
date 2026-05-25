@@ -265,7 +265,7 @@ app.get("/api/usuarios/:id_usuario/foto", (req, res) => {
 // Obtener todos los usuarios (para select de miembros)
 app.get("/api/usuarios", ah(async (req, res) => {
     const [usuarios] = await poolBD.execute(
-        "SELECT id_usuario, nombre, nombre_usuario, correo_electronico FROM usuario ORDER BY nombre ASC"
+        "SELECT id_usuario, nombre, nombre_usuario, correo_electronico FROM usuario WHERE COALESCE(offline,0) = 0 ORDER BY nombre ASC"
     );
     res.json(usuarios);
 }));
@@ -590,15 +590,15 @@ app.delete("/api/grupos/:id_grupo/miembros/:id_usuario", ah(async (req, res) => 
 
 // Crear transacción + participantes
 app.post("/api/transacciones", ah(async (req, res) => {
-    const { id_grupo, tipo, concepto, monto, id_pagador, id_receptor, participantes } = req.body;
+    const { id_grupo, tipo, concepto, monto, id_pagador, id_receptor, participantes, id_presupuesto } = req.body;
 
     if (!id_grupo || !tipo || !concepto || monto == null || !id_pagador) {
         return res.status(400).json({ error: "Faltan campos" });
     }
 
     const [r] = await poolBD.execute(
-        `INSERT INTO transaccion (id_grupo, tipo, estado, concepto, monto, id_pagador, id_receptor)
-     VALUES (?,?,?,?,?,?,?)`,
+        `INSERT INTO transaccion (id_grupo, tipo, estado, concepto, monto, id_pagador, id_receptor, id_presupuesto)
+     VALUES (?,?,?,?,?,?,?,?)`,
         [
             Number(id_grupo),
             tipo,
@@ -606,7 +606,8 @@ app.post("/api/transacciones", ah(async (req, res) => {
             concepto,
             Number(monto),
             Number(id_pagador),
-            id_receptor ? Number(id_receptor) : null
+            id_receptor ? Number(id_receptor) : null,
+            id_presupuesto ? Number(id_presupuesto) : null
         ]
     );
 
@@ -902,6 +903,291 @@ app.patch("/api/notificaciones/:id_notificacion", ah(async (req, res) => {
     res.json({ ok: true });
 }));
 
+/* =========================
+   PRESUPUESTOS (grupos recurrentes)
+========================= */
+
+// Helper: calcular rango del período activo dado fecha_inicio y periodo
+function calcularPeriodoActivo(periodo) {
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth(); // 0-based
+    let inicio, fin;
+    if (periodo === 'mensual') {
+        inicio = new Date(y, m, 1);
+        fin = new Date(y, m + 1, 0);
+    } else if (periodo === 'trimestral') {
+        const trimestre = Math.floor(m / 3);
+        inicio = new Date(y, trimestre * 3, 1);
+        fin = new Date(y, trimestre * 3 + 3, 0);
+    } else if (periodo === 'semestral') {
+        const semestre = m < 6 ? 0 : 1;
+        inicio = new Date(y, semestre * 6, 1);
+        fin = new Date(y, semestre * 6 + 6, 0);
+    } else { // anual
+        inicio = new Date(y, 0, 1);
+        fin = new Date(y, 11, 31);
+    }
+    return { inicio, fin };
+}
+
+// GET presupuestos de un grupo con gasto_actual y dias_restantes
+app.get("/api/grupos/:id_grupo/presupuestos", ah(async (req, res) => {
+    const id_grupo = Number(req.params.id_grupo);
+    const [presupuestos] = await poolBD.execute(
+        "SELECT * FROM presupuesto WHERE id_grupo = ? AND activo = 1 ORDER BY id_presupuesto ASC",
+        [id_grupo]
+    );
+
+    const result = [];
+    for (const p of presupuestos) {
+        const { inicio, fin } = calcularPeriodoActivo(p.periodo);
+        const inicioStr = inicio.toISOString().slice(0, 10);
+        const finStr = fin.toISOString().slice(0, 10);
+
+        const [[gastoRow]] = await poolBD.execute(
+            `SELECT COALESCE(SUM(monto), 0) AS gasto_actual
+             FROM transaccion
+             WHERE id_grupo = ? AND id_presupuesto = ?
+               AND DATE(COALESCE(fecha_transaccion, fecha_creacion)) BETWEEN ? AND ?`,
+            [id_grupo, p.id_presupuesto, inicioStr, finStr]
+        );
+
+        const hoy = new Date();
+        const diasRestantes = Math.max(0, Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24)));
+
+        result.push({
+            ...p,
+            gasto_actual: Number(gastoRow.gasto_actual),
+            dias_restantes: diasRestantes,
+            periodo_inicio: inicioStr,
+            periodo_fin: finStr
+        });
+    }
+    res.json(result);
+}));
+
+// POST crear presupuesto
+app.post("/api/grupos/:id_grupo/presupuestos", ah(async (req, res) => {
+    const id_grupo = Number(req.params.id_grupo);
+    const { nombre, importe, periodo, fecha_inicio, icono } = req.body;
+    if (!nombre || !importe || !fecha_inicio) {
+        return res.status(400).json({ error: "nombre, importe y fecha_inicio son obligatorios" });
+    }
+    const [r] = await poolBD.execute(
+        "INSERT INTO presupuesto (id_grupo, nombre, importe, periodo, fecha_inicio, icono) VALUES (?,?,?,?,?,?)",
+        [id_grupo, nombre, Number(importe), periodo || 'mensual', fecha_inicio, icono || 'fa-receipt']
+    );
+    res.status(201).json({ id_presupuesto: r.insertId });
+}));
+
+// PUT editar presupuesto
+app.put("/api/presupuestos/:id", ah(async (req, res) => {
+    const id = Number(req.params.id);
+    const { nombre, importe, periodo, fecha_inicio, icono } = req.body;
+    await poolBD.execute(
+        "UPDATE presupuesto SET nombre=?, importe=?, periodo=?, fecha_inicio=?, icono=? WHERE id_presupuesto=?",
+        [nombre, Number(importe), periodo || 'mensual', fecha_inicio, icono || 'fa-receipt', id]
+    );
+    res.json({ ok: true });
+}));
+
+// DELETE eliminar presupuesto (soft delete)
+app.delete("/api/presupuestos/:id", ah(async (req, res) => {
+    const id = Number(req.params.id);
+    await poolBD.execute("UPDATE presupuesto SET activo=0 WHERE id_presupuesto=?", [id]);
+    res.json({ ok: true });
+}));
+
+// Helper: devuelve los últimos N rangos de período
+function calcularUltimosPeriodos(periodo, n) {
+    const hoy = new Date();
+    const resultado = [];
+    for (let i = n - 1; i >= 0; i--) {
+        let inicio, fin, label;
+        if (periodo === 'mensual') {
+            inicio = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+            fin   = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0);
+            label = inicio.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }).toUpperCase();
+        } else if (periodo === 'trimestral') {
+            const t = Math.floor(hoy.getMonth() / 3) - i;
+            const y = hoy.getFullYear() + Math.floor(t / 4);
+            const q = ((t % 4) + 4) % 4;
+            inicio = new Date(y, q * 3, 1);
+            fin   = new Date(y, q * 3 + 3, 0);
+            label = `T${q + 1} ${y}`;
+        } else if (periodo === 'semestral') {
+            const s = Math.floor(hoy.getMonth() / 6) - i;
+            const y = hoy.getFullYear() + Math.floor(s / 2);
+            const sem = ((s % 2) + 2) % 2;
+            inicio = new Date(y, sem * 6, 1);
+            fin   = new Date(y, sem * 6 + 6, 0);
+            label = `S${sem + 1} ${y}`;
+        } else { // anual
+            inicio = new Date(hoy.getFullYear() - i, 0, 1);
+            fin   = new Date(hoy.getFullYear() - i, 11, 31);
+            label = String(hoy.getFullYear() - i);
+        }
+        resultado.push({
+            label,
+            inicio: inicio.toISOString().slice(0, 10),
+            fin: fin.toISOString().slice(0, 10),
+            esActual: i === 0
+        });
+    }
+    return resultado;
+}
+
+// GET estadísticas recurrente de un grupo
+app.get("/api/grupos/:id_grupo/estadisticas-recurrente", ah(async (req, res) => {
+    const id_grupo = Number(req.params.id_grupo);
+    const [presupuestos] = await poolBD.execute(
+        "SELECT * FROM presupuesto WHERE id_grupo = ? AND activo = 1",
+        [id_grupo]
+    );
+    if (presupuestos.length === 0) return res.json({ periodos: [], breakdown: [], stats: {} });
+
+    const periodo = presupuestos[0].periodo;
+    const totalPresupuestado = presupuestos.reduce((s, p) => s + Number(p.importe), 0);
+    const ultimos6 = calcularUltimosPeriodos(periodo, 6);
+
+    // Gasto real por período
+    const periodosConGasto = [];
+    for (const rango of ultimos6) {
+        const [[row]] = await poolBD.execute(
+            `SELECT COALESCE(SUM(monto), 0) AS gastado
+             FROM transaccion
+             WHERE id_grupo = ? AND tipo = 'gasto'
+               AND DATE(COALESCE(fecha_transaccion, fecha_creacion)) BETWEEN ? AND ?`,
+            [id_grupo, rango.inicio, rango.fin]
+        );
+        const gastado = Number(row.gastado);
+        periodosConGasto.push({
+            label: rango.label,
+            presupuestado: totalPresupuestado,
+            gastado,
+            surplus: totalPresupuestado - gastado,
+            esActual: rango.esActual
+        });
+    }
+
+    // Breakdown por presupuesto (período actual)
+    const { inicio: iniAct, fin: finAct } = calcularPeriodoActivo(periodo);
+    const iniStr = iniAct.toISOString().slice(0, 10);
+    const finStr = finAct.toISOString().slice(0, 10);
+    const [[totalActRow]] = await poolBD.execute(
+        `SELECT COALESCE(SUM(monto), 0) AS total FROM transaccion
+         WHERE id_grupo = ? AND tipo = 'gasto' AND DATE(COALESCE(fecha_transaccion, fecha_creacion)) BETWEEN ? AND ?`,
+        [id_grupo, iniStr, finStr]
+    );
+    const totalActual = Number(totalActRow.total) || 1;
+    const breakdown = [];
+    for (const p of presupuestos) {
+        const [[pRow]] = await poolBD.execute(
+            `SELECT COALESCE(SUM(monto), 0) AS gastado FROM transaccion
+             WHERE id_presupuesto = ? AND DATE(COALESCE(fecha_transaccion, fecha_creacion)) BETWEEN ? AND ?`,
+            [p.id_presupuesto, iniStr, finStr]
+        );
+        const gastado = Number(pRow.gastado);
+        breakdown.push({
+            nombre: p.nombre,
+            icono: p.icono || 'fa-receipt',
+            importe: Number(p.importe),
+            gastado,
+            porcentaje: Math.round((gastado / totalActual) * 100)
+        });
+    }
+
+    // Stats agregados (últimos 5 períodos cerrados)
+    const cerrados = periodosConGasto.filter(p => !p.esActual);
+    const avgSurplus = cerrados.length > 0
+        ? cerrados.reduce((s, p) => s + p.surplus, 0) / cerrados.length : 0;
+    const worstPeriod = cerrados.reduce((worst, p) => (!worst || p.surplus < worst.surplus) ? p : worst, null);
+    const estables = cerrados.filter(p => p.gastado <= p.presupuestado).length;
+    const stability = cerrados.length > 0 ? Math.round((estables / cerrados.length) * 100) : 100;
+    const savingsRate = totalPresupuestado > 0
+        ? Math.round((avgSurplus / totalPresupuestado) * 100) : 0;
+
+    // Solo períodos con actividad real
+    const periodosActivos = periodosConGasto.filter(p => p.gastado > 0 || p.esActual);
+
+    res.json({
+        periodos: periodosActivos,
+        breakdown,
+        stats: {
+            avgSurplus,
+            worstOverspend: worstPeriod ? Math.min(0, worstPeriod.surplus) : 0,
+            worstOverspendLabel: worstPeriod?.label || '',
+            stability,
+            savingsRate,
+            periodo
+        }
+    });
+}));
+
+// GET transacciones de un presupuesto en el período activo
+app.get("/api/presupuestos/:id/transacciones", ah(async (req, res) => {
+    const id_presupuesto = Number(req.params.id);
+    const [[p]] = await poolBD.execute(
+        "SELECT * FROM presupuesto WHERE id_presupuesto = ?", [id_presupuesto]
+    );
+    if (!p) return res.status(404).json({ error: 'Presupuesto no encontrado' });
+
+    const { inicio, fin } = calcularPeriodoActivo(p.periodo);
+    const inicioStr = inicio.toISOString().slice(0, 10);
+    const finStr = fin.toISOString().slice(0, 10);
+
+    const [txs] = await poolBD.execute(
+        `SELECT t.id_transaccion, t.id_grupo, t.concepto, t.monto, t.estado, t.tipo,
+                t.id_pagador, t.fecha_creacion, t.fecha_transaccion,
+                u.nombre AS nombre_pagador
+         FROM transaccion t
+         LEFT JOIN usuario u ON u.id_usuario = t.id_pagador
+         WHERE t.id_presupuesto = ?
+           AND DATE(COALESCE(t.fecha_transaccion, t.fecha_creacion)) BETWEEN ? AND ?
+         ORDER BY COALESCE(t.fecha_transaccion, t.fecha_creacion) DESC`,
+        [id_presupuesto, inicioStr, finStr]
+    );
+
+    // Cargar participantes para cada transacción
+    const txIds = txs.map(t => t.id_transaccion);
+    let participantesMap = {};
+    if (txIds.length > 0) {
+        const placeholders = txIds.map(() => '?').join(',');
+        const [parts] = await poolBD.execute(
+            `SELECT pt.id_transaccion, pt.id_usuario, pt.monto_debe, pt.pagado, pt.fecha_pago,
+                    COALESCE(u.nombre, 'Usuario eliminado') AS usuario_nombre
+             FROM participante_transaccion pt
+             LEFT JOIN usuario u ON u.id_usuario = pt.id_usuario
+             WHERE pt.id_transaccion IN (${placeholders})`,
+            txIds
+        );
+        parts.forEach(p => {
+            if (!participantesMap[p.id_transaccion]) participantesMap[p.id_transaccion] = [];
+            participantesMap[p.id_transaccion].push(p);
+        });
+    }
+
+    const hoy = new Date();
+    const diasTranscurridos = Math.max(1, Math.ceil((hoy - inicio) / (1000 * 60 * 60 * 24)));
+    const gastoActual = txs.reduce((s, t) => s + Number(t.monto), 0);
+    const gastoDiarioPromedio = gastoActual / diasTranscurridos;
+    const diasRestantes = Math.max(0, Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24)));
+
+    const transacciones = txs.map(t => ({
+        ...t,
+        participantes: participantesMap[t.id_transaccion] || [],
+        tiene_imagen: false
+    }));
+
+    res.json({
+        presupuesto: { ...p, gasto_actual: gastoActual, dias_restantes: diasRestantes, periodo_inicio: inicioStr, periodo_fin: finStr },
+        transacciones,
+        gasto_diario_promedio: gastoDiarioPromedio,
+        periodo: { inicio: inicioStr, fin: finStr }
+    });
+}));
+
 // Middleware global de errores
 app.use((err, req, res, next) => {
     console.error("[ERROR]", err.message);
@@ -931,6 +1217,23 @@ poolBD.execute(`
 
 poolBD.execute(`ALTER TABLE grupo ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) DEFAULT 'clasico'`)
     .catch(err => console.warn("[migración] tipo en grupo:", err.message));
+
+poolBD.execute(`
+    CREATE TABLE IF NOT EXISTS presupuesto (
+        id_presupuesto INT AUTO_INCREMENT PRIMARY KEY,
+        id_grupo INT NOT NULL,
+        nombre VARCHAR(100) NOT NULL,
+        importe DECIMAL(10,2) NOT NULL,
+        periodo ENUM('mensual','trimestral','semestral','anual') DEFAULT 'mensual',
+        fecha_inicio DATE NOT NULL,
+        icono VARCHAR(50) DEFAULT 'fa-receipt',
+        activo TINYINT(1) DEFAULT 1,
+        FOREIGN KEY (id_grupo) REFERENCES grupo(id_grupo) ON DELETE CASCADE
+    )
+`).catch(err => console.warn("[migración] presupuesto:", err.message));
+
+poolBD.execute(`ALTER TABLE transaccion ADD COLUMN IF NOT EXISTS id_presupuesto INT NULL`)
+    .catch(err => console.warn("[migración] id_presupuesto en transaccion:", err.message));
 
 poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS offline TINYINT(1) DEFAULT 0`)
     .catch(err => console.warn("[migración] offline en usuario:", err.message));

@@ -673,6 +673,14 @@
                             </div>
                             <i class="fas fa-chevron-right group-type-arrow"></i>
                         </button>
+                        <button type="button" class="group-type-card" data-tipo="recurrente">
+                            <div class="group-type-icon" style="background:rgba(78,222,163,0.12);color:#4edea3"><i class="fas fa-sync-alt"></i></div>
+                            <div class="group-type-info">
+                                <strong>Recurrente</strong>
+                                <span>Gestiona presupuestos por categoría con ciclos mensuales, trimestrales o anuales. Ideal para gastos del hogar o personales.</span>
+                            </div>
+                            <i class="fas fa-chevron-right group-type-arrow"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -825,6 +833,13 @@
                         <div id="participantesTransaccion" class="participantes-check-group"></div>
                     </div>
 
+                    <div class="form-group" id="containerPresupuestoSelect" style="display:none">
+                        <label for="presupuestoTransaccion">Presupuesto <span class="label-optional">opcional</span></label>
+                        <select id="presupuestoTransaccion">
+                            <option value="">Sin presupuesto</option>
+                        </select>
+                    </div>
+
                     <div class="form-group">
                         <label for="imagenTransaccion">Adjuntar ticket <span class="label-optional">opcional</span></label>
                         <label class="file-upload-label" for="imagenTransaccion">
@@ -937,6 +952,74 @@
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-close="modalEditarGrupo">Cancelar</button>
                     <button type="submit" class="btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Crear/Editar Presupuesto -->
+    <div id="modalCrearPresupuesto" class="modal">
+        <div class="modal-content modal-gasto">
+            <div class="modal-gasto-header">
+                <div class="modal-gasto-icon"><i class="fas fa-wallet"></i></div>
+                <div>
+                    <h3 id="modalCrearPresupuestoTitle">Nuevo Presupuesto</h3>
+                    <p class="modal-gasto-subtitle">Define un límite de gasto por categoría</p>
+                </div>
+                <button class="btn-close" data-close="modalCrearPresupuesto">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="formCrearPresupuesto">
+                <input type="hidden" id="editPresupuestoId" value="">
+                <div class="modal-gasto-body">
+                    <!-- Selector de icono -->
+                    <div class="form-group">
+                        <label>Icono</label>
+                        <div class="rec-icon-picker" id="iconPickerGrid">
+                            <button type="button" class="rec-icon-option active" data-icon="fa-utensils"><i class="fas fa-utensils"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-home"><i class="fas fa-home"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-car"><i class="fas fa-car"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-film"><i class="fas fa-film"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-bolt"><i class="fas fa-bolt"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-shopping-cart"><i class="fas fa-shopping-cart"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-medkit"><i class="fas fa-medkit"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-plane"><i class="fas fa-plane"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-graduation-cap"><i class="fas fa-graduation-cap"></i></button>
+                            <button type="button" class="rec-icon-option" data-icon="fa-receipt"><i class="fas fa-receipt"></i></button>
+                        </div>
+                        <input type="hidden" id="presupuestoIcono" value="fa-utensils">
+                    </div>
+                    <div class="form-group modal-gasto-concepto">
+                        <label for="presupuestoNombre">Nombre de la categoría</label>
+                        <input type="text" id="presupuestoNombre" required placeholder="Ej: Alimentación">
+                    </div>
+                    <div class="modal-gasto-row">
+                        <div class="form-group">
+                            <label for="presupuestoImporte">Límite (€)</label>
+                            <div class="input-prefix-wrap">
+                                <span class="input-prefix">€</span>
+                                <input type="number" id="presupuestoImporte" step="0.01" min="0.01" required placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="presupuestoPeriodo">Período</label>
+                            <select id="presupuestoPeriodo">
+                                <option value="mensual">Mensual</option>
+                                <option value="trimestral">Trimestral</option>
+                                <option value="semestral">Semestral</option>
+                                <option value="anual">Anual</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="presupuestoFechaInicio">Fecha inicio</label>
+                        <input type="date" id="presupuestoFechaInicio" required>
+                    </div>
+                </div>
+                <div class="modal-gasto-footer">
+                    <button type="button" class="btn-secondary" data-close="modalCrearPresupuesto">Cancelar</button>
+                    <button type="submit" class="btn-primary" id="btnSubmitPresupuesto"><i class="fas fa-plus"></i> Guardar</button>
                 </div>
             </form>
         </div>
