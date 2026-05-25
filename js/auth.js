@@ -1,6 +1,8 @@
 // auth.js - Gestión de autenticación (API Node/Express + MySQL)
 
-const API_URL = "http://localhost:3000/api";
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? "http://localhost:3000/api"
+  : `http://${window.location.hostname}:3000/api`;
 
 class AuthManager {
     constructor() {

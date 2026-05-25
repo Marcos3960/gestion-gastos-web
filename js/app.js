@@ -18,6 +18,14 @@ function initApp() {
   if (authManager.isAuthenticated()) {
     showScreen("appScreen");
     loadApp();
+
+    // Si viene de Stripe portal/checkout, navegar a la vista indicada
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    if (view) {
+      history.replaceState(null, "", window.location.pathname);
+      setTimeout(() => switchView(view), 300);
+    }
   } else {
     showScreen("loginScreen");
   }
@@ -193,6 +201,7 @@ function setupAppListeners() {
     document.getElementById("formCrearGrupo").reset();
     document.getElementById("formCrearGrupo").style.display = "none";
     document.getElementById("stepTipoGrupo").style.display = "";
+    document.getElementById("stepPremiumRequerido").style.display = "none";
     document.getElementById("modalCrearGrupoTitle").textContent = "Crear Nuevo Grupo";
     document.getElementById("resultadosBusqueda").innerHTML = "";
     document.getElementById("miembrosSeleccionados").innerHTML = "";
@@ -209,8 +218,21 @@ function setupAppListeners() {
 
   // Paso 1: seleccionar tipo
   document.querySelectorAll(".group-type-card").forEach(card => {
-    card.addEventListener("click", () => {
+    card.addEventListener("click", async () => {
       const tipo = card.dataset.tipo;
+
+      if (tipo === "recurrente") {
+        const u = authManager.getCurrentUser();
+        const resp = await fetch(`${API_URL}/premium/estado?id_usuario=${u.id}`);
+        const estado = await resp.json();
+        if (!estado.premium) {
+          document.getElementById("stepTipoGrupo").style.display = "none";
+          document.getElementById("stepPremiumRequerido").style.display = "";
+          document.getElementById("modalCrearGrupoTitle").textContent = "Apaxas Premium";
+          return;
+        }
+      }
+
       document.getElementById("tipoGrupoInput").value = tipo;
       document.getElementById("stepTipoGrupo").style.display = "none";
       document.getElementById("formCrearGrupo").style.display = "";
@@ -221,6 +243,12 @@ function setupAppListeners() {
       document.getElementById("seccionMiembrosClasico").style.display = tipo !== "offline" ? "" : "none";
       document.getElementById("seccionMiembrosOffline").style.display = tipo === "offline" ? "" : "none";
     });
+  });
+
+  document.getElementById("btnVolverDesdePremium").addEventListener("click", () => {
+    document.getElementById("stepPremiumRequerido").style.display = "none";
+    document.getElementById("stepTipoGrupo").style.display = "";
+    document.getElementById("modalCrearGrupoTitle").textContent = "Crear Nuevo Grupo";
   });
 
   document.getElementById("btnVolverTipoGrupo").addEventListener("click", () => {
@@ -313,10 +341,8 @@ function setupAppListeners() {
                 nombre: item.dataset.nombre,
                 username: item.dataset.username
               });
-              item.remove();
-              if (resultadosDiv.children.length === 0) {
-                resultadosDiv.innerHTML = '';
-              }
+              document.getElementById("buscarUsuario").value = "";
+              resultadosDiv.innerHTML = "";
             });
           });
         }
@@ -655,6 +681,83 @@ function cargarAjustes() {
       ajPassGuardar.disabled = false;
     }
   };
+
+  // Sección Premium
+  cargarEstadoPremium();
+}
+
+async function cargarEstadoPremium() {
+  const u = authManager.getCurrentUser();
+  const container = document.getElementById('ajPremiumSection');
+  if (!container || !u) return;
+
+  container.innerHTML = `<div style="color:var(--on-surface-muted);font-size:0.85rem">Cargando estado...</div>`;
+
+  try {
+    const resp = await fetch(`${API_URL}/premium/estado?id_usuario=${u.id}`);
+    const data = await resp.json();
+
+    if (data.premium) {
+      const hasta = data.premium_hasta ? new Date(data.premium_hasta).toLocaleDateString('es-ES') : '—';
+      container.innerHTML = `
+        <div class="aj-premium-badge active">
+          <i class="fas fa-crown"></i> Premium activo
+        </div>
+        <p class="aj-premium-desc">Tu suscripción está activa hasta el <strong>${hasta}</strong>.</p>
+        <button class="aj-premium-manage-btn" id="btnGestionarPremium">
+          <i class="fas fa-external-link-alt"></i> Gestionar suscripción
+        </button>`;
+      document.getElementById('btnGestionarPremium').onclick = async () => {
+        try {
+          const resp = await fetch(`${API_URL}/stripe/portal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_usuario: u.id })
+          });
+          const data = await resp.json();
+          if (data.url) window.open(data.url, '_blank');
+          else showPopup('No se pudo abrir el portal de Stripe', 'error');
+        } catch {
+          showPopup('Error al conectar con Stripe', 'error');
+        }
+      };
+    } else {
+      container.innerHTML = `
+        <div class="aj-premium-badge inactive">
+          <i class="fas fa-lock"></i> Sin Premium
+        </div>
+        <p class="aj-premium-desc">Accede a los <strong>Grupos Recurrentes</strong> con presupuestos automáticos por solo <strong>4,99€/mes</strong>.</p>
+        <ul class="aj-premium-features">
+          <li><i class="fas fa-check"></i> Grupos con presupuestos recurrentes</li>
+          <li><i class="fas fa-check"></i> Estadísticas avanzadas por período</li>
+          <li><i class="fas fa-check"></i> Historial de ciclos completados</li>
+        </ul>
+        <button class="aj-premium-btn" id="btnContratarPremium">
+          <i class="fas fa-crown"></i> Contratar Premium
+        </button>`;
+      document.getElementById('btnContratarPremium').onclick = async () => {
+        const btn = document.getElementById('btnContratarPremium');
+        btn.textContent = 'Redirigiendo...';
+        btn.disabled = true;
+        try {
+          const r = await fetch(`${API_URL}/stripe/checkout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_usuario: u.id })
+          });
+          const { url, error } = await r.json();
+          if (error) throw new Error(error);
+          window.location.href = url;
+        } catch(err) {
+          showPopup('Error al iniciar el pago: ' + err.message, 'error');
+          btn.innerHTML = '<i class="fas fa-crown"></i> Contratar Premium';
+          btn.disabled = false;
+        }
+      };
+    }
+  } catch {
+    container.innerHTML = `<p style="color:var(--on-surface-muted);font-size:0.85rem">No se pudo cargar el estado Premium.</p>`;
+  }
 }
 
 function _syncThemeButtons(theme) {
@@ -1748,10 +1851,8 @@ document.getElementById("buscarUsuarioGrupo").addEventListener("input", async (e
               nombre: item.dataset.nombre,
               username: item.dataset.username
             });
-            item.remove();
-            if (resultadosDiv.children.length === 0) {
-              resultadosDiv.innerHTML = '';
-            }
+            document.getElementById("buscarUsuarioGrupo").value = "";
+            resultadosDiv.innerHTML = "";
           });
         });
       }
@@ -2705,7 +2806,9 @@ function notifFiltrada(n) {
 }
 
 function notifMensajeLimpio(n) {
-  return (n.mensaje || "").replace(/^\[(gasto|deuda|actividad)\]\s*/i, "");
+  return (n.mensaje || "")
+    .replace(/^\[invitacion:\d+\]\s*/i, "")
+    .replace(/^\[(gasto|deuda|actividad)\]\s*/i, "");
 }
 
 async function loadNotificaciones() {
@@ -3055,7 +3158,6 @@ async function loadEstadisticas() {
               <div class="st-contact-sub">${label}</div>
             </div>
             <span class="st-contact-amount ${pos ? 'pos' : 'neg'}">${pos ? '+' : '-'}${formatEur(Math.abs(c.monto))}</span>
-            ${!pos ? `<button class="st-contact-btn saldar">${t('stats_settle_btn')}</button>` : ''}
           </div>`;
       }).join('');
     }

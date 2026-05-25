@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import { poolBD } from "./bd.js";
 import "dotenv/config";
+import Stripe from "stripe";
 import multer from "multer";
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { fileURLToPath } from "url";
@@ -61,11 +62,16 @@ const uploadPerfil = multer({
 
 const app = express();
 app.use(cors());
+// El webhook de Stripe necesita body raw ANTES del middleware JSON
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 
 const PUERTO = Number(process.env.PUERTO || 3000);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5500";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2023-10-16' });
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '';
 
 // Envuelve rutas async para capturar errores sin crashear el servidor
 const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -295,6 +301,15 @@ app.get("/api/grupos", ah(async (req, res) => {
 app.post("/api/grupos", ah(async (req, res) => {
     const { nombre, descripcion, divisa, id_admin, tipo } = req.body;
     if (!nombre || !id_admin) return res.status(400).json({ error: "Faltan campos" });
+
+    // Verificar premium para grupos recurrentes
+    if (tipo === 'recurrente') {
+        const [[u]] = await poolBD.execute(
+            'SELECT premium, premium_hasta FROM usuario WHERE id_usuario = ?', [Number(id_admin)]
+        );
+        const activo = u?.premium === 1 && (!u.premium_hasta || new Date(u.premium_hasta) > new Date());
+        if (!activo) return res.status(403).json({ error: 'premium_required' });
+    }
 
     const [r] = await poolBD.execute(
         "INSERT INTO grupo (nombre, descripcion, divisa, id_admin, tipo) VALUES (?,?,?,?,?)",
@@ -1240,6 +1255,163 @@ poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS offline TINYINT(1) 
 
 poolBD.execute(`ALTER TABLE usuario MODIFY COLUMN correo_electronico VARCHAR(255) NULL`)
     .catch(err => console.warn("[migración] correo_electronico nullable:", err.message));
+
+// Migraciones Premium
+poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS premium TINYINT(1) DEFAULT 0`)
+    .catch(err => console.warn("[migración] premium en usuario:", err.message));
+poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(100) NULL`)
+    .catch(err => console.warn("[migración] stripe_customer_id en usuario:", err.message));
+poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(100) NULL`)
+    .catch(err => console.warn("[migración] stripe_subscription_id en usuario:", err.message));
+poolBD.execute(`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS premium_hasta DATETIME NULL`)
+    .catch(err => console.warn("[migración] premium_hasta en usuario:", err.message));
+
+// ─── STRIPE ENDPOINTS ───────────────────────────────────────────────────────
+
+// GET estado premium del usuario
+app.get('/api/premium/estado', ah(async (req, res) => {
+    const id_usuario = Number(req.query.id_usuario);
+    if (!id_usuario) return res.status(400).json({ error: 'Falta id_usuario' });
+    const [[u]] = await poolBD.execute(
+        'SELECT premium, premium_hasta, stripe_subscription_id FROM usuario WHERE id_usuario = ?',
+        [id_usuario]
+    );
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+    const activo = u.premium === 1 && (!u.premium_hasta || new Date(u.premium_hasta) > new Date());
+    res.json({ premium: activo, premium_hasta: u.premium_hasta, subscription_id: u.stripe_subscription_id });
+}));
+
+// POST crear sesión de checkout de Stripe
+app.post('/api/stripe/checkout', ah(async (req, res) => {
+    const { id_usuario } = req.body;
+    if (!id_usuario) return res.status(400).json({ error: 'Falta id_usuario' });
+
+    const [[u]] = await poolBD.execute(
+        'SELECT correo_electronico, nombre, stripe_customer_id FROM usuario WHERE id_usuario = ?',
+        [id_usuario]
+    );
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    let customerId = u.stripe_customer_id;
+    if (!customerId) {
+        const customer = await stripe.customers.create({
+            email: u.correo_electronico,
+            name: u.nombre,
+            metadata: { id_usuario: String(id_usuario) }
+        });
+        customerId = customer.id;
+        await poolBD.execute('UPDATE usuario SET stripe_customer_id = ? WHERE id_usuario = ?', [customerId, id_usuario]);
+    }
+
+    const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+        mode: 'subscription',
+        success_url: `${FRONTEND_URL}?premium=success`,
+        cancel_url: `${FRONTEND_URL}?premium=cancel`,
+        metadata: { id_usuario: String(id_usuario) }
+    });
+
+    res.json({ url: session.url });
+}));
+
+// POST abrir portal de gestión de Stripe (cancelar, cambiar método de pago, etc.)
+app.post('/api/stripe/portal', ah(async (req, res) => {
+    const { id_usuario } = req.body;
+    if (!id_usuario) return res.status(400).json({ error: 'Falta id_usuario' });
+
+    const [[u]] = await poolBD.execute(
+        'SELECT stripe_customer_id FROM usuario WHERE id_usuario = ?',
+        [Number(id_usuario)]
+    );
+    if (!u?.stripe_customer_id) return res.status(400).json({ error: 'Sin cliente de Stripe asociado' });
+
+    const session = await stripe.billingPortal.sessions.create({
+        customer: u.stripe_customer_id,
+        return_url: `${FRONTEND_URL}?view=grupos`
+    });
+
+    res.json({ url: session.url });
+}));
+
+// POST cancelar suscripción
+app.post('/api/stripe/cancelar', ah(async (req, res) => {
+    const { id_usuario } = req.body;
+    const [[u]] = await poolBD.execute(
+        'SELECT stripe_subscription_id FROM usuario WHERE id_usuario = ?',
+        [id_usuario]
+    );
+    if (!u?.stripe_subscription_id) return res.status(400).json({ error: 'Sin suscripción activa' });
+
+    await stripe.subscriptions.update(u.stripe_subscription_id, { cancel_at_period_end: true });
+    res.json({ ok: true, mensaje: 'Suscripción cancelada al final del período' });
+}));
+
+// POST webhook de Stripe (body raw)
+app.post('/api/stripe/webhook', async (req, res) => {
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error('[Stripe webhook] Firma inválida:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    const getUsuarioByCustomer = async (customerId) => {
+        const [[u]] = await poolBD.execute(
+            'SELECT id_usuario FROM usuario WHERE stripe_customer_id = ?', [customerId]
+        );
+        return u?.id_usuario;
+    };
+
+    try {
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object;
+                const idUsuario = session.metadata?.id_usuario || await getUsuarioByCustomer(session.customer);
+                if (idUsuario && session.subscription) {
+                    const sub = await stripe.subscriptions.retrieve(session.subscription);
+                    const hasta = new Date(sub.current_period_end * 1000);
+                    await poolBD.execute(
+                        'UPDATE usuario SET premium = 1, stripe_subscription_id = ?, premium_hasta = ? WHERE id_usuario = ?',
+                        [session.subscription, hasta, idUsuario]
+                    );
+                }
+                break;
+            }
+            case 'invoice.paid': {
+                const invoice = event.data.object;
+                const idUsuario = await getUsuarioByCustomer(invoice.customer);
+                if (idUsuario && invoice.subscription) {
+                    const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+                    const hasta = new Date(sub.current_period_end * 1000);
+                    await poolBD.execute(
+                        'UPDATE usuario SET premium = 1, premium_hasta = ? WHERE id_usuario = ?',
+                        [hasta, idUsuario]
+                    );
+                }
+                break;
+            }
+            case 'customer.subscription.deleted':
+            case 'invoice.payment_failed': {
+                const obj = event.data.object;
+                const idUsuario = await getUsuarioByCustomer(obj.customer);
+                if (idUsuario) {
+                    await poolBD.execute(
+                        'UPDATE usuario SET premium = 0, stripe_subscription_id = NULL WHERE id_usuario = ?',
+                        [idUsuario]
+                    );
+                }
+                break;
+            }
+        }
+    } catch (err) {
+        console.error('[Stripe webhook] Error procesando evento:', err.message);
+    }
+
+    res.json({ received: true });
+});
 
 app.listen(PUERTO, () => {
     console.log(`API escuchando en http://localhost:${PUERTO}`);

@@ -416,6 +416,7 @@
                             <a href="#ajPreferencias" class="aj-nav-item" data-i18n-text="aj_nav_preferencias">Preferencias <i class="fas fa-chevron-right"></i></a>
                             <a href="#ajNotificaciones" class="aj-nav-item" data-i18n-text="aj_nav_notificaciones">Notificaciones <i class="fas fa-chevron-right"></i></a>
                             <a href="#ajSeguridad" class="aj-nav-item" data-i18n-text="aj_nav_seguridad">Seguridad <i class="fas fa-chevron-right"></i></a>
+                            <a href="#ajPremium" class="aj-nav-item"><i class="fas fa-crown" style="color:#f59e0b;margin-right:0.3rem"></i> Premium <i class="fas fa-chevron-right"></i></a>
                         </nav>
                     </aside>
 
@@ -513,6 +514,14 @@
                             </div>
                         </section>
 
+                        <!-- SECCIÓN PREMIUM -->
+                        <section class="aj-card" id="ajPremium">
+                            <p class="aj-section-label"><i class="fas fa-crown" style="color:#f59e0b;margin-right:0.4rem"></i>SUSCRIPCIÓN PREMIUM</p>
+                            <div id="ajPremiumSection">
+                                <div style="color:var(--on-surface-muted);font-size:0.85rem">Cargando...</div>
+                            </div>
+                        </section>
+
                         <!-- NOTIFICACIONES -->
                         <section class="aj-card" id="ajNotificaciones">
                             <p class="aj-section-label" data-i18n="aj_notif_title">NOTIFICACIONES Y ALERTAS</p>
@@ -605,7 +614,6 @@
                             </div>
                         </section>
 
-
                     </div>
                 </div>
             </div>
@@ -680,6 +688,31 @@
                                 <span>Gestiona presupuestos por categoría con ciclos mensuales, trimestrales o anuales. Ideal para gastos del hogar o personales.</span>
                             </div>
                             <i class="fas fa-chevron-right group-type-arrow"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paso 1b: Pantalla Premium requerido -->
+            <div id="stepPremiumRequerido" style="display:none">
+                <div class="premium-gate">
+                    <div class="premium-gate-icon">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <h3 class="premium-gate-title">Función Premium</h3>
+                    <p class="premium-gate-desc">Los grupos recurrentes son exclusivos de Apaxas Premium. Activa tu suscripción para crear grupos con presupuestos por categoría, ciclos automáticos y estadísticas avanzadas.</p>
+                    <ul class="premium-gate-features">
+                        <li><i class="fas fa-check"></i> Grupos con ciclos mensuales, trimestrales y anuales</li>
+                        <li><i class="fas fa-check"></i> Presupuestos por categoría</li>
+                        <li><i class="fas fa-check"></i> Estadísticas y gráficas avanzadas</li>
+                        <li><i class="fas fa-check"></i> Sin límite de grupos</li>
+                    </ul>
+                    <div class="premium-gate-actions">
+                        <button type="button" class="btn-secondary" id="btnVolverDesdePremium">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </button>
+                        <button type="button" class="btn-premium" onclick="closeModal('modalCrearGrupo'); switchView('ajustes'); setTimeout(()=>document.getElementById('tabPremium')?.click(),200)">
+                            <i class="fas fa-crown"></i> Activar Premium
                         </button>
                     </div>
                 </div>
