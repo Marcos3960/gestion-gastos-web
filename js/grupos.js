@@ -37,6 +37,8 @@ class GruposManager {
         });
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
+            if (err.error === 'limit_reached') throw new Error('limit_reached');
+            if (err.error === 'premium_required') throw new Error('premium_required');
             throw new Error(err.error || "No se pudo crear el grupo");
         }
 

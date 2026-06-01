@@ -385,6 +385,14 @@ small {
   gap: 0.75rem;
 }
 
+.app-logo-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .app-logo {
   font-size: 1.25rem;
   font-weight: 700;

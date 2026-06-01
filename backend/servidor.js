@@ -69,6 +69,7 @@ app.use("/uploads", express.static(uploadsDir));
 
 const PUERTO = Number(process.env.PUERTO || 3000);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5500";
+const APP_URL = process.env.APP_URL || `${FRONTEND_URL}/apaxas.html`;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2023-10-16' });
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '';
@@ -302,13 +303,23 @@ app.post("/api/grupos", ah(async (req, res) => {
     const { nombre, descripcion, divisa, id_admin, tipo } = req.body;
     if (!nombre || !id_admin) return res.status(400).json({ error: "Faltan campos" });
 
+    const [[u]] = await poolBD.execute(
+        'SELECT premium, premium_hasta FROM usuario WHERE id_usuario = ?', [Number(id_admin)]
+    );
+    const premiumActivo = u?.premium === 1 && (!u.premium_hasta || new Date(u.premium_hasta) > new Date());
+
     // Verificar premium para grupos recurrentes
-    if (tipo === 'recurrente') {
-        const [[u]] = await poolBD.execute(
-            'SELECT premium, premium_hasta FROM usuario WHERE id_usuario = ?', [Number(id_admin)]
+    if (tipo === 'recurrente' && !premiumActivo) {
+        return res.status(403).json({ error: 'premium_required' });
+    }
+
+    // Limitar a 3 grupos para usuarios sin premium
+    if (!premiumActivo) {
+        const [[{ total }]] = await poolBD.execute(
+            'SELECT COUNT(*) as total FROM miembro_grupo WHERE id_usuario = ? AND rol = ?',
+            [Number(id_admin), 'admin']
         );
-        const activo = u?.premium === 1 && (!u.premium_hasta || new Date(u.premium_hasta) > new Date());
-        if (!activo) return res.status(403).json({ error: 'premium_required' });
+        if (total >= 3) return res.status(403).json({ error: 'limit_reached' });
     }
 
     const [r] = await poolBD.execute(
@@ -1308,8 +1319,8 @@ app.post('/api/stripe/checkout', ah(async (req, res) => {
         payment_method_types: ['card'],
         line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
         mode: 'subscription',
-        success_url: `${FRONTEND_URL}?premium=success`,
-        cancel_url: `${FRONTEND_URL}?premium=cancel`,
+        success_url: `${APP_URL}?premium=success`,
+        cancel_url: `${APP_URL}?premium=cancel`,
         metadata: { id_usuario: String(id_usuario) }
     });
 
@@ -1329,7 +1340,7 @@ app.post('/api/stripe/portal', ah(async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
         customer: u.stripe_customer_id,
-        return_url: `${FRONTEND_URL}?view=grupos`
+        return_url: `${APP_URL}?view=grupos`
     });
 
     res.json({ url: session.url });

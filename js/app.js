@@ -422,7 +422,14 @@ function setupAppListeners() {
       await loadGrupos();
       resetModalCrearGrupo();
     } catch (error) {
-      showPopup(error.message, "error");
+      if (error.message === 'limit_reached') {
+        closeModal("modalCrearGrupo");
+        showPopup("Has alcanzado el límite de 3 grupos. Hazte Premium para crear grupos ilimitados.", "error");
+      } else if (error.message === 'premium_required') {
+        showPopup("Los grupos recurrentes requieren una suscripción Premium.", "error");
+      } else {
+        showPopup(error.message, "error");
+      }
     }
   });
 
