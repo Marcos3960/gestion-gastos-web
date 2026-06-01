@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS grupo (
     descripcion     TEXT             NULL,
     divisa          CHAR(3)          NOT NULL DEFAULT 'EUR',
     id_admin        INT UNSIGNED     NOT NULL,
-    tipo            ENUM('clasico','recurrente') NOT NULL DEFAULT 'clasico',
+    tipo            VARCHAR(20)      NOT NULL DEFAULT 'clasico',
     fecha_creacion  DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id_grupo),
     CONSTRAINT fk_grupo_admin FOREIGN KEY (id_admin) REFERENCES usuario (id_usuario)

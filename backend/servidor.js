@@ -1244,6 +1244,10 @@ poolBD.execute(`
 poolBD.execute(`ALTER TABLE grupo ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) DEFAULT 'clasico'`)
     .catch(err => console.warn("[migración] tipo en grupo:", err.message));
 
+// Ampliar el tipo a VARCHAR por si fue creado como ENUM (no admite 'offline')
+poolBD.execute(`ALTER TABLE grupo MODIFY COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'clasico'`)
+    .catch(err => console.warn("[migración] modify tipo en grupo:", err.message));
+
 poolBD.execute(`
     CREATE TABLE IF NOT EXISTS presupuesto (
         id_presupuesto INT AUTO_INCREMENT PRIMARY KEY,
@@ -1422,6 +1426,12 @@ app.post('/api/stripe/webhook', async (req, res) => {
     }
 
     res.json({ received: true });
+});
+
+// Manejador de errores global — devuelve siempre JSON en vez de HTML
+app.use((err, req, res, next) => {
+    console.error('[Error]', err.message);
+    res.status(err.statusCode || err.status || 500).json({ error: err.message || 'Error interno del servidor' });
 });
 
 app.listen(PUERTO, () => {

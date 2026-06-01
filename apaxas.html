@@ -615,6 +615,20 @@
                             </div>
                         </section>
 
+                        <!-- EXPORTAR DATOS -->
+                        <section class="aj-card" id="ajExportar">
+                            <p class="aj-section-label"><i class="fas fa-file-pdf" style="color:#e74c3c;margin-right:0.4rem"></i>MIS DATOS</p>
+                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+                                <div>
+                                    <div class="aj-security-label" style="margin-bottom:0.3rem">Exportar informe completo</div>
+                                    <div style="color:var(--on-surface-muted);font-size:0.82rem">Descarga un PDF con tu perfil, grupos y todas tus transacciones.</div>
+                                </div>
+                                <button class="aj-edit-btn" id="btnExportarPDF" style="background:rgba(231,76,60,0.12);border-color:rgba(231,76,60,0.3);color:#e74c3c;white-space:nowrap">
+                                    <i class="fas fa-file-pdf"></i> Descargar PDF
+                                </button>
+                            </div>
+                        </section>
+
                     </div>
                 </div>
             </div>
@@ -1076,6 +1090,7 @@
 
     <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="js/i18n.js"></script>
     <script src="js/auth.js" defer></script>
     <script src="js/grupos.js" defer></script>

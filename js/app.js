@@ -691,6 +691,10 @@ function cargarAjustes() {
 
   // Sección Premium
   cargarEstadoPremium();
+
+  // Exportar PDF
+  const btnPDF = document.getElementById("btnExportarPDF");
+  if (btnPDF) btnPDF.onclick = exportarDatosPDF;
 }
 
 async function cargarEstadoPremium() {
@@ -3035,6 +3039,194 @@ function showConfirmPopup(message, confirmLabel = "Confirmar", tone = "primary")
     popup.appendChild(body);
     popup.appendChild(actions);
   });
+}
+
+
+async function loadImageBase64(src) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+async function exportarDatosPDF() {
+  const btn = document.getElementById("btnExportarPDF");
+  if (btn) { btn.textContent = "Generando..."; btn.disabled = true; }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const u = authManager.getCurrentUser();
+
+    const [grupos, transacciones, logoBase64] = await Promise.all([
+      fetch(`${API_URL}/grupos?id_usuario=${u.id}`).then(r => r.json()),
+      fetch(`${API_URL}/transacciones?id_usuario=${u.id}`).then(r => r.json()),
+      loadImageBase64("assets/logo.png")
+    ]);
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const M = 15;
+    let y = 0;
+
+    // Paleta: azul corporativo + texto normal sobre blanco
+    const AZUL      = [46, 98, 255];   // #2e62ff  azul fuerte
+    const AZUL_CLARO= [230, 235, 255]; // fondo cabecera tabla / filas alternas
+    const NEGRO      = [30, 30, 30];
+    const GRIS       = [100, 100, 110];
+    const BLANCO     = [255, 255, 255];
+
+    const newPage = (h = 10) => { if (y + h > 278) { doc.addPage(); y = 15; } };
+
+    const sectionHeader = (label) => {
+      newPage(12);
+      doc.setFillColor(...AZUL);
+      doc.rect(M, y, W - M * 2, 7, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...BLANCO);
+      doc.text(label.toUpperCase(), M + 3, y + 5);
+      y += 11;
+    };
+
+    const row = (label, value) => {
+      newPage(7);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...GRIS);
+      doc.text(label, M, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...NEGRO);
+      const lines = doc.splitTextToSize(String(value ?? "—"), W - M - 55);
+      doc.text(lines, M + 52, y);
+      y += lines.length * 6;
+    };
+
+    // ── Cabecera ──────────────────────────────────────────────
+    doc.setFillColor(...AZUL);
+    doc.rect(0, 0, W, 30, "F");
+    // Logo (badge blanco redondeado + imagen)
+    if (logoBase64) {
+      doc.setFillColor(...BLANCO);
+      doc.roundedRect(W - M - 20, 5, 20, 20, 3, 3, "F");
+      doc.addImage(logoBase64, "PNG", W - M - 19, 6, 18, 18);
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...BLANCO);
+    doc.text("APAXAS", M, 16);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(200, 210, 255);
+    doc.text("Informe de datos del usuario", M, 23);
+    const fecha = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+    doc.text(fecha, W - M - 24, 23, { align: "right" });
+    y = 38;
+
+    // ── Perfil ────────────────────────────────────────────────
+    sectionHeader("Perfil");
+    row("Nombre", u.nombre);
+    row("Usuario", u.nombreUsuario ? "@" + u.nombreUsuario : "—");
+    row("Correo electrónico", u.email);
+    y += 4;
+
+    // ── Resumen ───────────────────────────────────────────────
+    sectionHeader("Resumen");
+    const totalPagado = transacciones
+      .filter(t => String(t.id_pagador) === String(u.id))
+      .reduce((s, t) => s + Number(t.monto || 0), 0);
+    row("Grupos", grupos.length);
+    row("Transacciones", transacciones.length);
+    row("Total pagado por ti", totalPagado.toFixed(2));
+    y += 4;
+
+    // ── Grupos ────────────────────────────────────────────────
+    sectionHeader("Grupos");
+    if (!grupos.length) {
+      doc.setFontSize(9); doc.setTextColor(...GRIS); doc.setFont("helvetica", "italic");
+      doc.text("Sin grupos registrados.", M, y); y += 8;
+    } else {
+      for (const g of grupos) {
+        newPage(14);
+        doc.setFillColor(...AZUL_CLARO);
+        doc.rect(M, y - 1, W - M * 2, 12, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NEGRO);
+        doc.text(g.nombre, M + 3, y + 4);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...GRIS);
+        doc.text(`${g.divisa}  ·  ${g.num_miembros} miembro(s)  ·  ${(g.descripcion || "Sin descripción").substring(0, 55)}`, M + 3, y + 9.5);
+        y += 16;
+      }
+    }
+    y += 3;
+
+    // ── Transacciones ─────────────────────────────────────────
+    sectionHeader("Transacciones");
+    if (!transacciones.length) {
+      doc.setFontSize(9); doc.setTextColor(...GRIS); doc.setFont("helvetica", "italic");
+      doc.text("Sin transacciones registradas.", M, y); y += 8;
+    } else {
+      const COL = { concepto: M, grupo: M + 56, monto: M + 112, fecha: M + 136, estado: M + 158 };
+
+      const thead = () => {
+        newPage(9);
+        doc.setFillColor(...AZUL_CLARO);
+        doc.rect(M, y, W - M * 2, 7, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...AZUL);
+        doc.text("CONCEPTO", COL.concepto + 1, y + 4.8);
+        doc.text("GRUPO",    COL.grupo + 1,    y + 4.8);
+        doc.text("MONTO",    COL.monto + 1,    y + 4.8);
+        doc.text("FECHA",    COL.fecha + 1,    y + 4.8);
+        doc.text("ESTADO",   COL.estado + 1,   y + 4.8);
+        y += 8;
+      };
+      thead();
+
+      transacciones.forEach((t, i) => {
+        if (i > 0 && i % 32 === 0) { doc.addPage(); y = 15; thead(); }
+        if (i % 2 === 0) {
+          doc.setFillColor(245, 247, 255);
+          doc.rect(M, y - 1, W - M * 2, 6.5, "F");
+        }
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...NEGRO);
+        doc.text((t.concepto || "—").substring(0, 26),     COL.concepto + 1, y + 4);
+        doc.text((t.nombre_grupo || "—").substring(0, 18), COL.grupo + 1,    y + 4);
+        doc.text(Number(t.monto || 0).toFixed(2),          COL.monto + 1,    y + 4);
+        doc.text(t.fecha_creacion ? new Date(t.fecha_creacion).toLocaleDateString("es-ES") : "—", COL.fecha + 1, y + 4);
+        const esPagador = String(t.id_pagador) === String(u.id);
+        const estado = t.estado === "completada" ? "Completada" : esPagador ? "Pendiente" : t.yo_pague ? "Pagada" : "Pendiente";
+        doc.setTextColor(...(estado === "Completada" || estado === "Pagada" ? AZUL : GRIS));
+        doc.text(estado, COL.estado + 1, y + 4);
+        y += 6.5;
+      });
+    }
+
+    // ── Pie de página ─────────────────────────────────────────
+    const total = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= total; p++) {
+      doc.setPage(p);
+      doc.setDrawColor(...AZUL_CLARO);
+      doc.setLineWidth(0.3);
+      doc.line(M, 284, W - M, 284);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...GRIS);
+      doc.text(`APAXAS · ${fecha} · Página ${p} de ${total}`, W / 2, 289, { align: "center" });
+    }
+
+    doc.save(`apaxas_${u.nombreUsuario || u.id}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    showPopup("PDF generado correctamente", "success");
+  } catch (err) {
+    console.error(err);
+    showPopup("Error al generar el PDF: " + err.message, "error");
+  } finally {
+    if (btn) { btn.innerHTML = '<i class="fas fa-file-pdf"></i> Descargar PDF'; btn.disabled = false; }
+  }
 }
 
 
