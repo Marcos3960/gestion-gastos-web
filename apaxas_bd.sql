@@ -1,18 +1,10 @@
--- ============================================================
---  APAXAS — Base de datos completa
---  Motor: MariaDB / MySQL 5.7+
---  Codificación: utf8mb4
--- ============================================================
-
 CREATE DATABASE IF NOT EXISTS apaxas
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
 USE apaxas;
 
--- ------------------------------------------------------------
 --  USUARIO
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS usuario (
     id_usuario          INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     nombre              VARCHAR(100)     NOT NULL,
@@ -30,9 +22,7 @@ CREATE TABLE IF NOT EXISTS usuario (
     PRIMARY KEY (id_usuario)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
 --  GRUPO
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS grupo (
     id_grupo        INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     nombre          VARCHAR(100)     NOT NULL,
@@ -46,9 +36,7 @@ CREATE TABLE IF NOT EXISTS grupo (
         ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
 --  MIEMBRO_GRUPO
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS miembro_grupo (
     id_grupo    INT UNSIGNED                   NOT NULL,
     id_usuario  INT UNSIGNED                   NOT NULL,
@@ -59,9 +47,7 @@ CREATE TABLE IF NOT EXISTS miembro_grupo (
     CONSTRAINT fk_mg_usuario FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
 --  INVITACION_GRUPO
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS invitacion_grupo (
     id_invitacion   INT UNSIGNED                            NOT NULL AUTO_INCREMENT,
     id_grupo        INT UNSIGNED                            NOT NULL,
@@ -75,9 +61,7 @@ CREATE TABLE IF NOT EXISTS invitacion_grupo (
     CONSTRAINT fk_inv_invitador FOREIGN KEY (id_invitador) REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
---  PRESUPUESTO  (grupos recurrentes)
--- ------------------------------------------------------------
+--  PRESUPUESTO
 CREATE TABLE IF NOT EXISTS presupuesto (
     id_presupuesto  INT UNSIGNED                                    NOT NULL AUTO_INCREMENT,
     id_grupo        INT UNSIGNED                                    NOT NULL,
@@ -91,9 +75,7 @@ CREATE TABLE IF NOT EXISTS presupuesto (
     CONSTRAINT fk_pres_grupo FOREIGN KEY (id_grupo) REFERENCES grupo (id_grupo) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
 --  TRANSACCION
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS transaccion (
     id_transaccion      INT UNSIGNED                    NOT NULL AUTO_INCREMENT,
     id_grupo            INT UNSIGNED                    NOT NULL,
@@ -113,9 +95,7 @@ CREATE TABLE IF NOT EXISTS transaccion (
     CONSTRAINT fk_tx_presupuesto FOREIGN KEY (id_presupuesto) REFERENCES presupuesto (id_presupuesto) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
 --  PARTICIPANTE_TRANSACCION
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS participante_transaccion (
     id_transaccion  INT UNSIGNED    NOT NULL,
     id_usuario      INT UNSIGNED    NOT NULL,
@@ -127,9 +107,7 @@ CREATE TABLE IF NOT EXISTS participante_transaccion (
     CONSTRAINT fk_pt_usuario     FOREIGN KEY (id_usuario)     REFERENCES usuario     (id_usuario)     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
 --  NOTIFICACION
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS notificacion (
     id_notificacion INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     id_usuario      INT UNSIGNED     NOT NULL,
@@ -141,9 +119,7 @@ CREATE TABLE IF NOT EXISTS notificacion (
     CONSTRAINT fk_notif_usuario FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
---  LOG_GRUPO  (historial de actividad)
--- ------------------------------------------------------------
+--  LOG_GRUPO
 CREATE TABLE IF NOT EXISTS log_grupo (
     id_log      INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     id_grupo    INT UNSIGNED    NOT NULL,
@@ -156,9 +132,8 @@ CREATE TABLE IF NOT EXISTS log_grupo (
     CONSTRAINT fk_log_usuario FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
---  ÍNDICES adicionales para rendimiento
--- ------------------------------------------------------------
+--  ÍNDICES
+
 CREATE INDEX idx_miembro_usuario        ON miembro_grupo          (id_usuario);
 CREATE INDEX idx_inv_usuario_estado     ON invitacion_grupo       (id_usuario, estado);
 CREATE INDEX idx_tx_grupo_fecha         ON transaccion            (id_grupo, fecha_creacion);
